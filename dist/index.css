@@ -27,141 +27,110 @@
 }
 
 /* src/styles/game.css */
-:root {
-  --border-width: 2px;
-  --grid-size: 8;
-}
-
-.game {
+.game-ctr {
   display: flex;
   justify-content: center;
   align-items:  center;
-  gap: 10px;
+}
+
+@media (orientation: portrait) {
+  .game-ctr {
+    width: 100%;
+    height: 100%;
+  }
+}
+
+@media (orientation: landscape) {
+  .game-ctr {
+    width: calc(100% - 20px);
+    height: calc(100% - 20px);
+    margin: 20px;
+  }
+}
+
+.game {
+  display: grid;
   width: 100%;
   height: 100%;
 }
 
 @media (orientation: portrait) {
   .game {
-    --game-size: calc(min(100vw, 100dvh));
-    --game-padding: 0px;
-    flex-direction: column;
+    grid-template-rows: auto auto 1fr;
+    grid-template-columns: 1fr;
+    grid-template-areas: "a_info" "a_board" "a_act";
+    gap: 5px;
   }
 }
 
 @media (orientation: landscape) {
   .game {
-    --game-size: calc(min(100vw, 100dvh)  - 60px);
-    --game-padding: 10px;
-    margin: var(--game-padding);
-    flex-direction: row;
+    grid-template-columns: minmax(0, 50dvh) auto;
+    grid-template-rows: auto 1fr;
+    grid-template-areas: "a_info a_board" "a_act  a_board";
+    justify-content: center;
+    gap: 5px;
   }
 }
 
-.game-info {
+.game-panel {
   background-color: var(--col-bgPanel);
   display: flex;
   border-radius: 8px;
   flex-direction: column;
-  flex: 1;
   align-items:  center;
   padding: 20px;
 }
 
+.game-info {
+  grid-area: a_info;
+  display: flex;
+  container-type: inline-size;
+  justify-content: center;
+  align-items:  center;
+  width: 100%;
+  height: 100%;
+}
+
 @media (orientation: portrait) {
   .game-info {
-    width: var(--game-size);
+    flex-direction: row;
+    align-items:  flex-end;
+    gap: 30px;
   }
 }
 
 @media (orientation: landscape) {
   .game-info {
-    max-width: calc(.5 * var(--game-size));
-    height: calc(var(--game-size)  - 2 * var(--game-padding));
+    flex-direction: row;
+    align-items:  flex-end;
+    gap: 20px;
   }
 }
 
+@container (width <= 320px) {
+  .game-info-donate {
+    display: none;
+  }
+}
+
+.game-actions {
+  grid-area: a_act;
+  width: 100%;
+  height: 100%;
+}
+
 .game-board {
-  width: var(--game-size);
-  height: var(--game-size);
-  padding: var(--game-padding);
+  grid-area: a_board;
   aspect-ratio: 1;
-  background-color: var(--col-bgPanel);
-  display: grid;
-  grid-template-columns: repeat(var(--grid-size), 1fr);
-  grid-template-rows: repeat(var(--grid-size), 1fr);
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   -webkit-user-drag: none;
   user-select: none;
   touch-action: none;
-  border-radius: 8px;
-  flex: 0;
-}
-
-.tile {
-  display: flex;
-  position: relative;
-  aspect-ratio: 1;
-  z-index: 1;
-  touch-action: none;
-}
-
-.tileA {
-  background-color: var(--col-tileLight);
-}
-
-.tileB {
-  background-color: var(--col-tileDark);
-}
-
-.tile.highlight {
-  z-index: 100;
-}
-
-.tile.highlight:after {
-  content: "";
-  position: absolute;
-  pointer-events: none;
-  background-color: inherit;
-  border: var(--border-width) solid var(--col-tileHighlight2);
-  inset: -2px;
-}
-
-.tile[data-tile="House1"] {
-  background-color: var(--col-tileHouse1);
-}
-
-.tile[data-tile="House2"] {
-  background-color: var(--col-tileHouse2);
-}
-
-.tile[data-tile="House3"] {
-  background-color: var(--col-tileHouse3);
-}
-
-.tile[data-tile="Road"] {
-  background-color: var(--col-tileRoad1);
-}
-
-.tile[data-tile="Intersection"] {
-  background-color: var(--col-tileRoad2);
-}
-
-.tile[data-tile="Bridge"] {
-  background-color: var(--col-tileBridge);
-}
-
-.tile[data-tile="Water"] {
-  background-color: var(--col-tileWater);
-}
-
-.tile[data-tile="Grass"] {
-  background-color: var(--col-tileGrass);
-}
-
-.tile[data-tile="Tree"] {
-  background-color: var(--col-tileTree1);
+  max-width: 100%;
+  max-height: 100%;
+  padding: 0;
 }
 
 /* src/styles/credits.css */
@@ -181,6 +150,7 @@
 
 .credit {
   margin: 10px;
+  font-size: 12px;
 }
 
 .version {
@@ -227,7 +197,7 @@
   --col-border: #778da6;
   --col-bgBtn: #151618;
   --col-bgBtnHover: #2c2d2f;
-  --col-tileLight: #272e3b;
+  --col-tileLight: #242a34;
   --col-tileDark: #1d222b;
   --col-tileBorder: #1d2831;
   --col-tileHighlight: #1d2831;
@@ -293,6 +263,10 @@
   font-family: var(--font-body);
 }
 
+* {
+  box-sizing: border-box;
+}
+
 html, body {
   background-color: var(--col-bgDark);
   overflow: hidden;
@@ -300,11 +274,6 @@ html, body {
   width: 100vw;
   height: 100dvh;
   margin: 0;
-}
-
-h2 {
-  margin-top: .5em;
-  margin-bottom: .5em;
 }
 
 #version {
@@ -406,7 +375,8 @@ h2, .head {
   font-family: var(--font-heading);
   text-align: center;
   text-shadow: 0 2px 4px var(--col-shadow);
-  font-size: 1.75rem;
+  margin-bottom: 0;
+  font-size: 1.25rem;
   font-weight: 800;
 }
 

@@ -1,5 +1,7 @@
 // Auto-generated. Edit 'styles/_colors.json' instead
 
+import * as THREE from 'three';
+
 export const Colors = {
 	white: 0xFEFEFE,
 	black: 0x202020,
@@ -16,7 +18,7 @@ export const Colors = {
 	border: 0x778da6,
 	bgBtn: 0x151618,
 	bgBtnHover: 0x2c2d2f,
-	tileLight: 0x272e3b,
+	tileLight: 0x242a34,
 	tileDark: 0x1d222b,
 	tileBorder: 0x1d2831,
 	tileHighlight: 0x1d2831,
@@ -30,4 +32,36 @@ export const Colors = {
 	tileWater: 0x1a4a71,
 	tileGrass: 0x2b6228,
 	tileTree1: 0x40943d,
+} as const;
+
+export const Colors3 = {
+	white: new THREE.Color(Colors.white),
+	black: new THREE.Color(Colors.black),
+	good: new THREE.Color(Colors.good),
+	bad: new THREE.Color(Colors.bad),
+	bgDark: new THREE.Color(Colors.bgDark),
+	bgPanel: new THREE.Color(Colors.bgPanel),
+	textHeader: new THREE.Color(Colors.textHeader),
+	textHighlight: new THREE.Color(Colors.textHighlight),
+	textAccent: new THREE.Color(Colors.textAccent),
+	textDefault: new THREE.Color(Colors.textDefault),
+	textMuted: new THREE.Color(Colors.textMuted),
+	shadow: new THREE.Color(Colors.shadow),
+	border: new THREE.Color(Colors.border),
+	bgBtn: new THREE.Color(Colors.bgBtn),
+	bgBtnHover: new THREE.Color(Colors.bgBtnHover),
+	tileLight: new THREE.Color(Colors.tileLight),
+	tileDark: new THREE.Color(Colors.tileDark),
+	tileBorder: new THREE.Color(Colors.tileBorder),
+	tileHighlight: new THREE.Color(Colors.tileHighlight),
+	tileHighlight2: new THREE.Color(Colors.tileHighlight2),
+	tileHouse1: new THREE.Color(Colors.tileHouse1),
+	tileHouse2: new THREE.Color(Colors.tileHouse2),
+	tileHouse3: new THREE.Color(Colors.tileHouse3),
+	tileRoad1: new THREE.Color(Colors.tileRoad1),
+	tileRoad2: new THREE.Color(Colors.tileRoad2),
+	tileBridge: new THREE.Color(Colors.tileBridge),
+	tileWater: new THREE.Color(Colors.tileWater),
+	tileGrass: new THREE.Color(Colors.tileGrass),
+	tileTree1: new THREE.Color(Colors.tileTree1),
 } as const;

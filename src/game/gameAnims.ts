@@ -1,16 +1,30 @@
-import { float3, quat4 } from "../utils/threeUtils";
+import { Colors } from "../styles/colors";
+import { color3, float3, quat4 } from "../utils/threeUtils";
 import { BatchedInstance } from "./GameRenderer";
 import { GameState } from "./GameState";
-import { lerp } from "./P2";
-import * as THREE from 'three';
+import { lerp, P2 } from "./P2";
 
 export class GameAnim {
 	private static _nextID = 0;
 
 	public id = GameAnim._nextID++;
+	public name: string | undefined;
 	public delay: number = 0;
 	public time: number = 0;
-	public constructor(public act: (this: GameAnim, deltaTime: number) => void, public duration: number) { }
+	public duration: number = Anims.BaseDur;
+	public constructor(args: {
+		name?: string,
+		start?: (this: GameAnim) => void,
+		end?: (this: GameAnim) => void,
+		update?: (this: GameAnim, deltaTime: number) => void,
+		duration: number
+	}) {
+		this.name = args.name;
+		this.start = args.start;
+		this.update = args.update;
+		this.end = args.end;
+		this.duration = args.duration;
+	}
 
 	public isDone() { return this.time >= this.duration; }
 	public t01() { return Math.max(0, Math.min(1, this.time / this.duration)); }
@@ -21,7 +35,11 @@ export class GameAnim {
 		return this;
 	}
 
-	public update(deltaTime: number) {
+	public start: (() => void) | undefined;
+	public update: ((deltaTime: number) => void) | undefined;
+	public end: (() => void) | undefined;
+
+	public tick(deltaTime: number) {
 		if (this.delay > 0) {
 			const used = Math.min(this.delay, deltaTime);
 			this.delay -= used;
@@ -31,7 +49,7 @@ export class GameAnim {
 		}
 
 		this.time += deltaTime;
-		this.act.call(this, deltaTime);
+		this.update?.call(this, deltaTime);
 	}
 }
 
@@ -44,120 +62,214 @@ export namespace Anims {
 		let duration = 0;
 		for (const anim of anims) {
 			if (!anim) continue;
-			duration = Math.max(anim.delay + anim.duration);
+			duration = Math.max(duration, anim.delay + anim.duration);
 		}
 
-		return new GameAnim(function (dt) {
-			for (let i = 0; i < anims.length; ++i) {
-				const anim = anims[i];
-				if (!anim) continue;
+		return new GameAnim({
+			name: combined.name,
+			duration: duration,
+			start: function () {
+				anims.forEach(anim => anim?.start?.());
+			},
+			update: function (dt) {
+				for (let i = 0; i < anims.length; ++i) {
+					const anim = anims[i];
+					if (!anim) continue;
 
-				anim.update(dt)
+					anim.tick(dt)
 
-				if (anim.isDone()) {
-					anims[i] = null!;
+					if (anim.isDone()) {
+						anims[i] = null!;
+					}
 				}
+			},
+			end: function () {
+				anims.forEach(anim => anim?.end?.());
 			}
-		}, duration);
+		});
 	}
 
-	export function growModel(model: BatchedInstance, targetSize: number, duration: number): GameAnim {
+	export function growModel(
+		model: BatchedInstance,
+		targetSize: number,
+		duration: number = Anims.BaseDur): GameAnim {
 		const initialSize = 0;
-		return new GameAnim(function () {
-			const [t, s] = this.lil();
-			model.setScale(lerp(initialSize, targetSize, t));
-		}, duration);
+		return new GameAnim({
+			name: growModel.name,
+			duration: duration,
+			update: function (dt) {
+				const [t, s] = this.lil();
+				model.setScale(lerp(initialSize, targetSize, t));
+			},
+		});
 	}
 	export function growModelTowards(
 		model: BatchedInstance,
 		targetPos: float3,
 		targetSize: number,
-		duration: number): GameAnim {
-		const initPos = model.position.clone();
-		const initScale = model.scale.clone();
+		duration: number = Anims.BaseDur): GameAnim {
+		let initPos = new float3();
+		let initScale = new float3();
 		const targetScale = new float3(targetSize, targetSize, targetSize);
-		return new GameAnim(function () {
-			const [t, s] = this.lil();
-			const l = t;
 
-			// Move
-			model.position.copy(initPos);
-			model.position.lerp(targetPos, l);
+		return new GameAnim({
+			name: growModelTowards.name,
+			duration: duration,
+			start: function () {
+				initPos.copy(model.position);
+				initScale.copy(model.scale);
+			},
+			update: function (dt) {
+				const [t, s] = this.lil();
+				const l = t;
 
-			// Grow
-			model.scale.copy(initScale);
-			model.scale.lerp(targetScale, l);
+				// Move
+				model.position.copy(initPos);
+				model.position.lerp(targetPos, l);
 
-			// Flush
-			model.updateMatrix();
-		}, duration);
+				// Grow
+				model.scale.copy(initScale);
+				model.scale.lerp(targetScale, l);
+
+				// Flush
+				model.updateMatrix();
+			},
+		});
 	}
 	export function growModelTRS(
 		model: BatchedInstance,
 		targetPos: float3,
 		targetRot: quat4,
 		targetScale: float3,
-		duration: number): GameAnim {
-		const initPos = model.position.clone();
-		const initRot = model.rotation.clone();
-		const initScale = model.scale.clone();
-		return new GameAnim(function () {
-			const [t, s] = this.lil();
-			const l = t;
+		duration: number = Anims.BaseDur): GameAnim {
+		let initPos = new float3();
+		let initRot = new quat4();
+		let initScale = new float3();
 
-			model.position.copy(initPos);
-			model.position.lerp(targetPos, l);
-			model.rotation.copy(targetRot);
-			// model.rotation.slerp(targetRot, l);
-			model.scale.copy(initScale);
-			model.scale.lerp(targetScale, l);
+		return new GameAnim({
+			name: growModelTRS.name,
+			duration: duration,
+			start: function () {
+				initPos.copy(model.position);
+				initRot.copy(model.rotation);
+				initScale.copy(model.scale);
+			},
+			update: function (dt) {
+				const [t, s] = this.lil();
+				const l = t;
 
-			// Flush
-			model.updateMatrix();
-		}, duration);
+				model.position.copy(initPos);
+				model.position.lerp(targetPos, l);
+				model.rotation.copy(initRot);
+				model.rotation.slerp(targetRot, l);
+				model.scale.copy(initScale);
+				model.scale.lerp(targetScale, l);
+
+				// Flush
+				model.updateMatrix();
+			},
+		});
 	}
 
-	export function destroyModel(model: BatchedInstance, duration: number): GameAnim {
-		const initialSize = model.scale.x;
-		return new GameAnim(function () {
-			const [t, s] = this.lil();
-			model.setScale(lerp(initialSize, 0, t));
-			if (this.isDone()) {
+	export function destroyModel(
+		model: BatchedInstance,
+		duration: number = Anims.BaseDur): GameAnim {
+		let initScale = model.scale.clone();
+		const targetScale = new float3(0, 0, 0);
+
+		return new GameAnim({
+			name: destroyModel.name,
+			duration: duration,
+			start: function () {
+				initScale.copy(model.scale);
+			},
+			update: function (dt) {
+				const [t, s] = this.lil();
+
+				model.scale.copy(initScale);
+				model.scale.lerp(targetScale, t);
+				model.updateMatrix();
+			},
+			end: function () {
 				model.destroy();
-			}
-		}, duration);
+			},
+		});
 	}
-	export function mergeModel(model: BatchedInstance, targetPos: float3, duration: number): GameAnim {
-		const initScale = model.scale.clone();
-		const initPos = model.position.clone();
-		const targetScale = new float3(0);
+	export function destroyModels(
+		models: BatchedInstance[],
+		duration: number = Anims.BaseDur
+	) {
+		return Anims.combined(models.map(
+			m => Anims.destroyModel(m, duration)
+		));
+	}
 
-		let isDone = false;
+	export function mergeModel(
+		model: BatchedInstance,
+		mergePos: float3,
+		duration: number = Anims.BaseDur): GameAnim {
+		let initPos = new float3();
+		let initScale = new float3();
+		const targetPos = mergePos.clone();
+		const targetScale = new float3(0, 0, 0);
 
-		return new GameAnim(function () {
-			if (isDone) {
-				console.log("call after done", this);
-			}
+		return new GameAnim({
+			name: mergeModel.name,
+			duration: duration,
+			start: function () {
+				initPos.copy(model.position);
+				initScale.copy(model.scale);
+			},
+			update: function (dt) {
+				const [t, s] = this.lil();
 
-			const [t, s] = this.lil();
+				// First 75% of animation merges
+				const p = Math.min(1, t * 4.0 / 3.0);
+				model.position.copy(initPos);
+				model.position.lerp(targetPos, p);
 
-			// First 75% of animation merges
-			const p = Math.min(1, t * 4.0 / 3.0);
-			model.position.copy(initPos);
-			model.position.lerp(targetPos, p);
+				// Decrease size to zero over duration
+				model.scale.copy(initScale);
+				model.scale.lerp(targetScale, t);
 
-			// Decrease size to zero over duration
-			model.scale.copy(initScale);
-			model.scale.lerp(targetScale, t);
-
-			// Flush changes
-			model.updateMatrix();
-
-			// Destroy the model after merging
-			if (this.isDone()) {
+				// Flush changes
+				model.updateMatrix();
+			},
+			end: function () {
 				model.destroy();
-				isDone = true;
-			}
-		}, duration);
+			},
+		});
+	}
+
+	export function addCount(
+		game: GameState,
+		pos: P2,
+		value: number,
+		duration: number = 2 * Anims.BaseDur): GameAnim {
+		const initialPos = new float3(pos.x, pos.y, 1);
+		const model = game.renderer.addModel(
+			game.assets.model_RoadJoin,
+			new float3(pos.x, pos.y, 1),
+			0,
+			new color3(Colors.white));
+
+		return new GameAnim({
+			name: addCount.name,
+			duration: duration,
+			update: function (dt) {
+				const [t, s] = this.lil();
+				const size = 0.4 * (3 * s * t + t * t);
+
+				model.position.set(
+					initialPos.x,
+					initialPos.y + 0.5 * t,
+					initialPos.z);
+				model.scale.set(size, size, size);
+				model.updateMatrix();
+			},
+			end: function () {
+				model.destroy();
+			},
+		});
 	}
 }

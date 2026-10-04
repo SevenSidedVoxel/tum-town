@@ -10,7 +10,7 @@ import { Tiles } from "../game/Tile";
 export class GameView implements IView {
 	private ctx: AppCtx;
 	private boardElem: HTMLElement | null | undefined;
-	private infoElem: HTMLElement | null | undefined;
+	private actionsElem: HTMLElement | null | undefined;
 	private scoreElem: HTMLElement | null | undefined;
 
 	private game: GameState = new GameState();
@@ -21,31 +21,31 @@ export class GameView implements IView {
 	}
 
 	enter(ctx: AppCtx): void {
-		const creditsHtml =/*html*/`
-<p class="credit">Developed by SevenSidedVoxel</p>
-<a class="kofi-link" href='https://ko-fi.com/C5L027OU2F' target='_blank'>
-	<img style='height:2em;'
-		src='https://storage.ko-fi.com/cdn/kofi3.png?v=6'
-		alt='Buy Me a Coffee at ko-fi.com' />
-</a>
-<p class="version">${BuildID} - ${BuildTimestamp}</p>
-		`;
-
 		ctx.root.innerHTML = /*html*/`
-<div class="game">
-	<section id="gameInfo" class="game-info">
-		<h2>Tum Town</h2>
-		<p id="score">Score: <span>0</span></p>
-
-		<div class="credits-landscape">
-			${creditsHtml}
-		</div>
-	</section>
-	<section id="gameBoard" class="game-board">
-	</section>
-	<section id="gameCredits" class="credits-portrait">
-		${creditsHtml}
-	</section>
+<div class="game-ctr">
+	<div class="game">
+		<section id="gameInfo" class="game-panel game-info">
+			<span>
+				<h2>Tum Town</h2>
+				<p class="credit">by SevenSidedVoxel</p>
+			</span>
+			<span class="game-info-donate">
+				<a class="kofi-link" href='https://ko-fi.com/C5L027OU2F' target='_blank'>
+					<img style='height:2em;'
+						src='https://storage.ko-fi.com/cdn/kofi3.png?v=6'
+						alt='Buy Me a Coffee at ko-fi.com' />
+				</a>
+				<p class="version">${BuildID} - ${BuildTimestamp}</p>
+			</span>
+		</section>
+		
+		<section id="gameBoard" class="game-panel game-board">
+		</section>
+		
+		<section id="gameActions" class="game-panel game-actions">
+			<p id="score">Score: <span>0</span></p>
+		</section>
+	</div>
 </div>
 		`;
 
@@ -55,10 +55,10 @@ export class GameView implements IView {
 		// Setup renderer
 		this.renderer.setupAsync(this.boardElem, this.game);
 
-		this.infoElem = ctx.root.querySelector("#gameInfo");
-		if (this.infoElem == null) return;
+		this.actionsElem = ctx.root.querySelector("#gameActions");
+		if (this.actionsElem == null) return;
 
-		this.scoreElem = this.infoElem.querySelector("#score>span");
+		this.scoreElem = this.actionsElem.querySelector("#score>span");
 		if (this.scoreElem == null) return;
 
 		window.addEventListener('pointermove', this.handlePointerMove);
@@ -66,6 +66,8 @@ export class GameView implements IView {
 		window.addEventListener('pointerup', this.handlePointerUp);
 		window.addEventListener('pointercancel', this.handlePointerCancel);
 		window.addEventListener('keydown', this.handleKeyPress);
+
+		this.game.onScoreUpdate = () => this.updateScore();
 
 		this.loop(0);
 	}
@@ -95,6 +97,8 @@ export class GameView implements IView {
 
 		this.game.placeTile(tile, Tiles.House1);
 		this.playNextAnim();
+
+		this.hoverTileStart(pos);
 	}
 	dragTile(start: P2, end: P2) {
 		// console.log(`drag ${start.name()} to ${end.name()}`);
@@ -104,11 +108,12 @@ export class GameView implements IView {
 	hoverTileStart(pos: P2) {
 		this.hoverPos = pos;
 		const tile = this.game.grid.getTile(this.hoverPos);
-		this.renderer.hoverTile(tile);
+		const canInteract = this.game.canPlaceTile(tile, Tiles.House1);
+		this.renderer.hoverTile(tile, canInteract);
 	}
 	hoverTileEnd() {
 		this.hoverPos = null;
-		this.renderer.hoverTile(null);
+		this.renderer.hoverTile(null, false);
 	}
 
 	//#region Visual State
@@ -130,7 +135,14 @@ export class GameView implements IView {
 			deltaTime *= 2;
 
 		for (const anim of this.anims)
-			anim.update(deltaTime);
+			anim.tick(deltaTime);
+
+		for (let i = this.anims.length - 1; i >= 0; --i) {
+			const anim = this.anims[i];
+			if (!anim?.isDone()) continue;
+			if (anim.end) anim.end();
+			this.anims.splice(i, 1);
+		}
 		this.anims = this.anims.filter(anim => !anim.isDone());
 
 		if (this.anims.length < 1)
@@ -146,6 +158,7 @@ export class GameView implements IView {
 
 		this._applyingAnims = true;
 		const anim = this.game.anims.shift()!;
+		if (anim.start) anim.start();
 		this.anims.push(anim);
 	}
 

@@ -40,3 +40,10 @@ THREE.Object3D.prototype.getGeometryByName = function (name: string): THREE.Buff
 
 	return undefined;
 }
+
+export class Utils3 {
+	public static rotZDeg(angle: number) { return this.rotZRad(angle * Math.PI / 180); }
+	public static rotZRad(angle: number) {
+		return new quat4().setFromAxisAngle(ZAxis, angle);
+	}
+}

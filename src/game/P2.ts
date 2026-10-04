@@ -11,9 +11,9 @@ export class P2 {
 		this.y = y ?? x ?? 0;
 	}
 
-	public copy(): P2 { return new P2(this.x, this.y); }
+	public clone(): P2 { return new P2(this.x, this.y); }
 
-	public rounded(): P2 { return this.copy().round(); }
+	public rounded(): P2 { return this.clone().round(); }
 	public round(): P2 {
 		this.x = Math.round(this.x);
 		this.y = Math.round(this.y);

@@ -10,6 +10,10 @@
 	font-family: var(--font-body);
 }
 
+* {
+	box-sizing: border-box;
+}
+
 html,
 body {
 	background-color: var(--col-bgDark);
@@ -20,11 +24,6 @@ body {
 	width: 100vw;
 	overflow: hidden;
 	position: fixed;
-}
-
-h2{
-	margin-top: 0.5em;
-	margin-bottom: 0.5em;
 }
 
 #version {
@@ -126,9 +125,10 @@ h2,
 	color: var(--col-textHeader);
 	font-family: var(--font-heading);
 	font-weight: 800;
-	font-size: 1.75rem;
+	font-size: 1.25rem;
 	text-align: center;
 	text-shadow: 0 2px 4px var(--col-shadow);
+	margin-bottom: 0px;
 }
 
 /* Buttons */

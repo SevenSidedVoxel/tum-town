@@ -22,39 +22,70 @@ export class GameState {
 
 	//#region Visuals
 
+	private _combinedAnimStack: GameAnim[][] = [];
+	private _currAnimList: GameAnim[] = this.anims;
+
 	public addAnim(anim: GameAnim | undefined) {
 		if (!anim) return;
-		this.anims.push(anim);
+		this._currAnimList.push(anim);
 		return anim;
 	}
 
+	public startCombinedAnim() {
+		this._combinedAnimStack.push(this._currAnimList);
+		this._currAnimList = [];
+	}
+
+	public endCombinedAnim() {
+		if (this._combinedAnimStack.length < 1)
+			throw "Unexpected end of combined animation";
+
+		let anim: GameAnim | undefined;
+		const prevList = this._combinedAnimStack.pop()!;
+		if (this._currAnimList.length == 1 && this._currAnimList[0])
+			anim = this._currAnimList[0];
+		else if (this._currAnimList.length > 1)
+			anim = Anims.combined(this._currAnimList);
+		else
+			anim = undefined;
+
+		this._currAnimList = prevList;
+		return anim;
+	}
+	public endAndAddCombinedAnim() {
+		const anim = this.endCombinedAnim();
+		this.addAnim(anim);
+	}
+
 	public regenVisuals() {
+		this.startCombinedAnim();
 		for (const tile of this.grid.tiles) {
 			if (!tile.shouldRegen) continue;
-			tile.shouldRegen = false;
-
-			if (!tile.draw || !tile.type.animRegen)
-				continue;
-
-			const anim = tile.type.animRegen(this, tile);
-			if (anim) this.anims.push(anim);
+			tile.regen(this);
 		}
+		this.endAndAddCombinedAnim();
 	}
 
 	//#endregion Visuals
 
 	//#region State Modification
 
+	public onScoreUpdate: undefined | (() => void);
+
 	public addScore(tile: Tile, s: number) {
 		this.score += s;
+		this.onScoreUpdate?.();
+		return Anims.addCount(this, tile.pos, s);
 	}
 
 	public addPop(tile: Tile, p: number) {
 		this.population += p;
+		return Anims.addCount(this, tile.pos, p);
 	}
 
 	public addNat(tile: Tile, n: number) {
 		this.nature += n;
+		return Anims.addCount(this, tile.pos, n);
 	}
 
 	private setTileType(tile: Tile, type: TileType) {
@@ -63,9 +94,13 @@ export class GameState {
 
 		console.log(`Setting ${tile.pos.name()} to '${type.name}'`);
 		tile.type = type;
+		tile.shouldRegen = true;
 
 		this.markForCheck(tile.pos.x, tile.pos.y);
 		this.markAdjForCheck(tile.pos);
+
+		if (tile.draw)
+			tile.draw.drawCache = {};
 	}
 
 	public replaceTile(tile: Tile, type: TileType) {
@@ -73,8 +108,8 @@ export class GameState {
 			// Tile is already empty or becoming empty,
 			//   so just use a single animation
 			this.setTileType(tile, type);
-			if (tile.type.animCreate)
-				this.addAnim(tile.type.animCreate(this, tile));
+
+			tile.regen(this);
 			return;
 		}
 
@@ -83,10 +118,8 @@ export class GameState {
 
 		// Animate the replacement of tile models
 		if (tile.type.animCreate) {
-			this.addAnim(Anims.combined([
-				Tiles.Empty.animCreate(this, tile),
-				tile.type.animCreate(this, tile)
-			]));
+			Tiles.Empty.animCreate(this, tile);
+			tile.regen(this);
 		}
 	}
 
@@ -102,28 +135,30 @@ export class GameState {
 		// Update Visuals
 		if (!targetTile.draw) return;
 
+		console.log("Start merge to " + targetTile.pos.name())
+		this.startCombinedAnim();
+
 		// Merge adjacent tiles
-		const targetPos = targetTile.draw.pos;
-		let anims: GameAnim[] = [];
+		const targetPos = targetTile.draw.centerPos;
 		for (const tile of tiles) {
 			if (!tile.draw) continue;
-			anims.push(tile.draw
+			this.addAnim(tile.draw
 				.mergeModelsInto(targetPos, Anims.BaseDur));
 		}
 
-		const delay = 0.25 * Anims.BaseDur;
-
 		// Destroy center tile
-		anims.push(targetTile.draw
-			.destroyAllModels(Anims.BaseDur)
-			.delayed(delay));
+		targetTile.draw.animDestroyAllModels(this, Anims.BaseDur);
 
 		// Create center tile
-		const createAnim = type.animCreate?.(this, targetTile);
-		if (createAnim)
-			anims.push(createAnim.delayed(delay));
+		const delay = 0.25 * Anims.BaseDur;
+		this.startCombinedAnim();
+		targetTile.regen(this);
+		let combAnim = this.endCombinedAnim();
+		this.addAnim(
+			combAnim?.delayed(delay)
+		);
 
-		this.addAnim(Anims.combined(anims));
+		this.endAndAddCombinedAnim();
 	}
 
 	//#endregion State Modification
@@ -177,6 +212,10 @@ export class GameState {
 		if (!this.isCreative && !this.hasItem(type))
 			return false; // no item
 
+		// Check if the tile type has a custom placement function
+		if (type.canPlace)
+			return type.canPlace(this, tile);
+
 		if (tile.type !== Tiles.Empty)
 			return false; // not empty
 
@@ -184,12 +223,16 @@ export class GameState {
 	}
 
 	public placeTile(tile: Tile, type: TileType) {
-		if (!this.canPlaceTile(tile, type)) {
-			return;
-		}
+		if (!this.canPlaceTile(tile, type))
+			return; // Cannot place
 
 		this.consumeItem(type);
-		this.replaceTile(tile, type);
+		if (type.place)
+			type.place(this, tile);
+		else
+			this.replaceTile(tile, type);
+
+		// Update game state
 		this.applyRules();
 		this.regenVisuals();
 	}

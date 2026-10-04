@@ -35,7 +35,7 @@ async function buildProject() {
 		entrypoints: [`${SRC_DIR}/index.html`],
 		outdir: DIST_DIR,
 		minify: false,
-		sourcemap: "external",
+		sourcemap: "inline",
 		naming: {
 			entry: "[name].[ext]",
 			chunk: "[name].[ext]",
@@ -68,11 +68,22 @@ async function extractColorTypings() {
 
 	let ts = `// Auto-generated. Edit 'styles/_colors.json' instead
 
+import * as THREE from 'three';
+
 export const Colors = {
 `;
 	for (const [key, value] of Object.entries(colors))
 		ts += `\t${key}: 0x${(value as string).replace('#', '')},\n`;
 	ts += `} as const;`
+
+	ts += `
+
+export const Colors3 = {
+`
+	for (const [key, value] of Object.entries(colors))
+		ts += `\t${key}: new THREE.Color(Colors.${key}),\n`;
+	ts += `} as const;`
+
 	await Bun.write(tsOutput, ts);
 
 	let css = `

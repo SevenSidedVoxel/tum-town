@@ -20,12 +20,14 @@ class RenderAssets {
 	public model_Missing!: number;
 	public model_TileBG!: number;
 	public model_Hover!: number;
+	public model_HoverActive!: number;
 	public model_House1!: number;
 	public model_House2!: number;
 	public model_House3!: number;
-	
+
 	public model_RoadSegment!: number;
 	public model_RoadJoin!: number;
+	public model_PathStone!: number;
 	public model_Intersection1!: number;
 
 
@@ -33,6 +35,7 @@ class RenderAssets {
 		this.model_Missing = batch.addGeometry(new THREE.BoxGeometry(0.5, 0.5, 0.5));
 		this.model_TileBG = batch.addGeometry(new THREE.PlaneGeometry(1, 1));
 		this.model_Hover = addGeom(this, 'hover');
+		this.model_HoverActive = addGeom(this, 'hover_active');
 		this.model_House1 = addGeom(this, 'house_001');
 		this.model_House2 = addGeom(this, 'house_002');
 		this.model_House3 = addGeom(this, 'house_003');
@@ -40,6 +43,7 @@ class RenderAssets {
 		this.model_Intersection1 = addGeom(this, 'road_001');
 		this.model_RoadSegment = addGeom(this, 'road_segment');
 		this.model_RoadJoin = addGeom(this, 'road_join');
+		this.model_PathStone = addGeom(this, 'road_stone');
 
 		function addGeom(self: RenderAssets, name: string) {
 			let geom = gltf.scene.getGeometryByName(name);
@@ -133,7 +137,7 @@ export class GameRenderer {
 	private game: GameState | undefined;
 
 	private gridSize: number = 0;
-	private hoverMesh!: BatchedInstance;
+	private hoverModel!: BatchedInstance;
 
 	public async setupForGame(game: GameState) {
 		this.game = game;
@@ -191,7 +195,7 @@ export class GameRenderer {
 
 					const rng = this.game.rng.slice(y * this.gridSize * 13 + x * 7);
 					tile.draw = new TileDraw(x, y, tileInst, rng);
-					position.copy(tile.draw.pos);
+					position.copy(tile.draw.centerPos);
 					position.z = -0.01;
 					matrix.makeTranslation(position);
 
@@ -204,31 +208,31 @@ export class GameRenderer {
 
 		// Hover Model
 		{
-			console.log("setup hover");
-			this.hoverMesh = this.addModel(
+			this.hoverModel = this.addModel(
 				this.assets.model_Hover,
 				new float3(0, 0, 0),
 				1,
 				new color3(Colors.bad))
 				.setName('hover tile');
-			this.hoverMesh.setVisible(false);
+			this.hoverModel.setVisible(false);
 		}
 
 		this.scene.add(this.drawBatch);
 	}
 
-	public hoverTile(tile: Tile | null) {
-		if (!this.hoverMesh)
+	public hoverTile(tile: Tile | null, canInteract: boolean) {
+		if (!this.hoverModel)
 			return;
 
 		if (!tile?.draw) {
-			this.hoverMesh.setVisible(false);
+			this.hoverModel.setVisible(false);
 			return;
 		}
 
-		const pos = tile.draw.pos;
-		this.hoverMesh.setPosition(pos.x, pos.y, 0);
-		this.hoverMesh.setVisible(true);
+		const pos = tile.draw.centerPos;
+		this.hoverModel.setMesh(canInteract ? this.assets.model_HoverActive : this.assets.model_Hover);
+		this.hoverModel.setPosition(pos.x, pos.y, 0);
+		this.hoverModel.setVisible(true);
 	}
 
 	public draw(frame: Frame) {
@@ -319,7 +323,6 @@ export class GameRenderer {
 		pos: float3,
 		size: number,
 		color: color3) {
-		const inst = this.drawBatch.addInstance(modelID);
 		const rotation = new quat4();
 		const scale = new float3(size, size, size);
 		const matrix = new mat4x4()
@@ -361,25 +364,28 @@ export class GameRenderer {
 		modelID: number,
 		tile: Tile,
 		color: color3,
+		duration: number,
 		pos: float3,
 		size: number,
-	): [model: BatchedInstance, anim: GameAnim];
+	): BatchedInstance;
 	public growMeshOnTile(
 		modelID: number,
 		tile: Tile,
 		color: color3,
+		duration: number,
 		pos: float3,
 		scale: float3,
 		rot: quat4,
-	): [model: BatchedInstance, anim: GameAnim];
+	): BatchedInstance;
 	public growMeshOnTile(
 		modelID: number,
 		tile: Tile,
 		color: color3,
+		duration: number,
 		pos: float3,
 		scale: number | float3,
 		rot?: quat4,
-	): [model: BatchedInstance, anim: GameAnim] {
+	): BatchedInstance {
 		// Create initial model
 		const model = this.addModel(modelID,
 			new float3(tile.pos.x, tile.pos.y, 0),
@@ -388,25 +394,25 @@ export class GameRenderer {
 		tile.draw?.models.push(model);
 
 		// Animate to target transform
-		let anim: GameAnim;
 		if (rot !== undefined) {
 			// Extract target transform
-			anim = Anims.growModelTRS(
-				model, pos, rot, scale as float3, Anims.BaseDur
-			);
+			this.game!.addAnim(Anims.growModelTRS(
+				model, pos, rot, scale as float3, duration
+			));
 		}
 		else {
-			anim = Anims.growModelTowards(
-				model, pos, scale as number, Anims.BaseDur
-			);
+			this.game?.addAnim(Anims.growModel(
+				model, scale as number, duration
+			));
 		}
-		return [model, anim];
+
+		return model;
 	}
 }
 
 export class BatchedInstance {
 	private static _nextID = 0;
-	public id: number = BatchedInstance._nextID++;
+	public debugId: number = BatchedInstance._nextID++;
 	private static _matrix = new mat4x4();
 
 	constructor(
@@ -420,6 +426,11 @@ export class BatchedInstance {
 	public name: string | undefined;
 	setName(name: string): BatchedInstance {
 		this.name = name;
+		return this;
+	}
+
+	setMesh(meshId: number) {
+		this.batch.setGeometryIdAt(this.instId, meshId);
 		return this;
 	}
 

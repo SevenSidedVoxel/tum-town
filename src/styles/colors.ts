@@ -30,8 +30,9 @@ export const Colors = {
 	tileRoad2: 0x47566f,
 	tileBridge: 0x47566f,
 	tileWater: 0x1a4a71,
-	tileGrass: 0x2b6228,
-	tileTree1: 0x40943d,
+	tileTree1: 0x2b6228,
+	tileTree2: 0x40943d,
+	tileTree3: 0x55b853,
 } as const;
 
 export const Colors3 = {
@@ -62,6 +63,7 @@ export const Colors3 = {
 	tileRoad2: new THREE.Color(Colors.tileRoad2),
 	tileBridge: new THREE.Color(Colors.tileBridge),
 	tileWater: new THREE.Color(Colors.tileWater),
-	tileGrass: new THREE.Color(Colors.tileGrass),
 	tileTree1: new THREE.Color(Colors.tileTree1),
+	tileTree2: new THREE.Color(Colors.tileTree2),
+	tileTree3: new THREE.Color(Colors.tileTree3),
 } as const;

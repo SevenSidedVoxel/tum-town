@@ -9,6 +9,7 @@ export class GameState {
 	public score: number = 0;
 	public population: number = 0;
 	public nature: number = 0;
+	private _actIndex: number = 0;
 
 	public grid: Grid = new Grid();
 	public rules: Rule[] = makeRules();
@@ -19,6 +20,18 @@ export class GameState {
 
 	public renderer: GameRenderer = new GameRenderer();
 	public get assets() { return this.renderer.assets; }
+
+	//#region Setup
+
+	public setup() {
+		this._actIndex = 0;
+
+		this.addItem(Tiles.House1, 1);
+		this.addItem(Tiles.Path, 1);
+		this.addItem(Tiles.Tree, 1);
+	}
+
+	//#endregion Setup
 
 	//#region Visuals
 
@@ -95,6 +108,7 @@ export class GameState {
 		console.log(`Setting ${tile.pos.name()} to '${type.name}'`);
 		tile.type = type;
 		tile.shouldRegen = true;
+		tile.actIndex = ++this._actIndex;
 
 		this.markForCheck(tile.pos.x, tile.pos.y);
 		this.markAdjForCheck(tile.pos);

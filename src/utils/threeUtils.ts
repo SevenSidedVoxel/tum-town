@@ -25,6 +25,9 @@ declare module 'three' {
 }
 
 THREE.Object3D.prototype.getGeometryByName = function (name: string): THREE.BufferGeometry | undefined {
+	// Blender removes dots in names before export
+	name = name.replaceAll('.', '');
+
 	const target = this.getObjectByName(name);
 	if (!target) return undefined;
 

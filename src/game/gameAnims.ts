@@ -1,4 +1,4 @@
-import { Colors } from "../styles/colors";
+import { Colors, Colors3 } from "../styles/colors";
 import { color3, float3, quat4 } from "../utils/threeUtils";
 import { BatchedInstance } from "./GameRenderer";
 import { GameState } from "./GameState";
@@ -251,7 +251,7 @@ export namespace Anims {
 			game.assets.model_RoadJoin,
 			new float3(pos.x, pos.y, 1),
 			0,
-			new color3(Colors.white));
+			Colors3.white);
 
 		return new GameAnim({
 			name: addCount.name,

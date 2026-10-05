@@ -109,8 +109,10 @@
 }
 
 @container (width <= 320px) {
-  .game-info-donate {
-    display: none;
+  @media (orientation: landscape) {
+    .game-info-donate {
+      display: none;
+    }
   }
 }
 
@@ -118,6 +120,12 @@
   grid-area: a_act;
   width: 100%;
   height: 100%;
+}
+
+.game-actions > * {
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
 }
 
 .game-board {
@@ -209,8 +217,9 @@
   --col-tileRoad2: #47566f;
   --col-tileBridge: #47566f;
   --col-tileWater: #1a4a71;
-  --col-tileGrass: #2b6228;
-  --col-tileTree1: #40943d;
+  --col-tileTree1: #2b6228;
+  --col-tileTree2: #40943d;
+  --col-tileTree3: #55b853;
 }
 
 /* src/styles/anims.css */

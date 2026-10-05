@@ -3,6 +3,7 @@ import { GLTF, GLTFLoader } from "three/examples/jsm/Addons.js";
 import { P2 } from "./P2";
 
 import glbModelsUrl from '../data/models.glb';
+
 import { Frame as Frame } from './Frame';
 import { GameState } from './GameState';
 
@@ -10,11 +11,13 @@ import '../utils/domUtils';
 import '../utils/threeUtils';
 import { Tile, TileDraw } from './Tile';
 import { BatchedMesh } from 'three';
-import { Colors } from '../styles/colors';
+import { Colors, Colors3 } from '../styles/colors';
 import { color3, float2, float3, float4, mat4x4, quat4 } from "../utils/threeUtils";
 import { Anims, GameAnim } from './GameAnims';
 
 class RenderAssets {
+	public texPalette: THREE.Texture | undefined;
+
 	public matDefault: THREE.Material | undefined;
 
 	public model_Missing!: number;
@@ -30,24 +33,32 @@ class RenderAssets {
 	public model_PathStone!: number;
 	public model_Intersection1!: number;
 
+	public model_Tree1!: number;
+	public model_Tree2!: number;
 
 	loadModels(gltf: GLTF, batch: BatchedMesh) {
 		this.model_Missing = batch.addGeometry(new THREE.BoxGeometry(0.5, 0.5, 0.5));
-		this.model_TileBG = batch.addGeometry(new THREE.PlaneGeometry(1, 1));
+		this.model_TileBG = addGeom(this, 'tile_bg');
 		this.model_Hover = addGeom(this, 'hover');
 		this.model_HoverActive = addGeom(this, 'hover_active');
-		this.model_House1 = addGeom(this, 'house_001');
-		this.model_House2 = addGeom(this, 'house_002');
-		this.model_House3 = addGeom(this, 'house_003');
+		this.model_House1 = addGeom(this, 'house.001');
+		this.model_House2 = addGeom(this, 'house.002');
+		this.model_House3 = addGeom(this, 'house.003');
 
-		this.model_Intersection1 = addGeom(this, 'road_001');
+		this.model_Intersection1 = addGeom(this, 'road.001');
 		this.model_RoadSegment = addGeom(this, 'road_segment');
 		this.model_RoadJoin = addGeom(this, 'road_join');
 		this.model_PathStone = addGeom(this, 'road_stone');
 
+		this.model_Tree1 = addGeom(this, 'tree.001');
+		this.model_Tree2 = addGeom(this, 'tree.002');
+
 		function addGeom(self: RenderAssets, name: string) {
 			let geom = gltf.scene.getGeometryByName(name);
-			if (!geom) return self.model_Missing;
+			if (!geom) {
+				console.warn(`Could not find model '${name}'`);
+				return self.model_Missing;
+			}
 			return batch.addGeometry(geom);
 		}
 	}
@@ -109,17 +120,69 @@ export class GameRenderer {
 	public drawBatch!: BatchedMesh;
 
 	private async loadResourcesAsync() {
-		this.assets.matDefault = new THREE.MeshStandardMaterial({
-			color: 0xFFFFFF,
-			roughness: 0.5,
-			metalness: 0.1,
-		});
-
+		// Load GLTF Data
 		const loader = new GLTFLoader();
 		const glbFetch = await fetch(glbModelsUrl);
 		const glbBuffer = await glbFetch.arrayBuffer();
 		const gltf = await loader.parseAsync(glbBuffer, '');
 
+		// Color Palette
+		this.assets.texPalette = await gltf.parser.getDependency('texture', 0);
+
+		// Material
+		this.assets.matDefault = new THREE.MeshStandardMaterial({
+			map: this.assets.texPalette, // color palette
+			// color: 0xFFFFFF, // tint
+			roughness: 0.5,
+			metalness: 0.1,
+		});
+		this.assets.matDefault.onBeforeCompile = (shader) => {
+			// Add varying: vInstanceColor
+			const varyings = /*glsl*/`
+varying vec3 vInstanceColor;
+varying vec2 vUv;
+`;
+			shader.vertexShader = varyings + shader.vertexShader;
+			shader.fragmentShader = varyings + shader.fragmentShader;
+
+			// Add varying vInstanceColor to vertex shader
+			shader.vertexShader = shader.vertexShader.replace(
+				'#include <begin_vertex>',
+				/*glsl*/`
+#include <begin_vertex>
+
+vUv = uv;
+vInstanceColor = vec3(1, 1, 1);
+#ifdef USE_INSTANCING_COLOR
+	vInstanceColor = instanceColor.rgb;
+#endif
+#ifdef USE_BATCHING_COLOR
+	vInstanceColor = getBatchingColor(getIndirectIndex(gl_DrawID)).rgb;
+#endif
+`
+			);
+
+			// Add varying vInstanceColor to vertex shader
+			shader.fragmentShader = shader.fragmentShader.replace(
+				'#include <color_fragment>',
+				/*glsl*/`
+const float InstUVSizeX = 1.0 / 16.0;
+const float InstUVSizeY = 15.0 / 16.0; // note the y-axis is flipped
+if (vUv.x < InstUVSizeX && vUv.y > InstUVSizeY) {
+	// override coloring with instance color
+	diffuseColor.rgb = vInstanceColor.rgb;
+}
+else
+{
+	// get default coloring
+	vec4 sampledDiffuseColor = texture2D(map, vUv);
+	diffuseColor = sampledDiffuseColor;
+}
+`
+			);
+		};
+
+		// Batched Mesh
 		const maxInstances = 1024;
 		const maxVertexCount = 10000;
 		const maxIndexCount = 20000;
@@ -131,6 +194,7 @@ export class GameRenderer {
 		this.drawBatch.receiveShadow = true;
 		this.drawBatch.matrixWorldAutoUpdate = true;
 
+		// Models
 		this.assets.loadModels(gltf, this.drawBatch);
 	}
 
@@ -157,13 +221,14 @@ export class GameRenderer {
 
 		// Lighting
 		{
-			this.scene.add(new THREE.AmbientLight(0xFFFFFF, 0.8));
+			this.scene.add(new THREE.AmbientLight(0xFFFFFF, 1));
 
-			const sun = new THREE.DirectionalLight(0xFFFFFF, 0.8);
+			const sun = new THREE.DirectionalLight(0xFFFFFF, 1);
 			sun.castShadow = true;
 			sun.position.set(10, 20, 20);
 			sun.shadow.mapSize.width = 2048;
 			sun.shadow.mapSize.height = 2048;
+			sun.shadow.bias = -0.00001;
 			sun.shadow.camera.near = 0.1;
 			sun.shadow.camera.far = 100;
 			sun.shadow.camera.left = -10;
@@ -212,7 +277,7 @@ export class GameRenderer {
 				this.assets.model_Hover,
 				new float3(0, 0, 0),
 				1,
-				new color3(Colors.bad))
+				Colors3.bad)
 				.setName('hover tile');
 			this.hoverModel.setVisible(false);
 		}
@@ -229,8 +294,9 @@ export class GameRenderer {
 			return;
 		}
 
-		const pos = tile.draw.centerPos;
+		const pos = tile.pos;
 		this.hoverModel.setMesh(canInteract ? this.assets.model_HoverActive : this.assets.model_Hover);
+		this.hoverModel.setColor(canInteract ? Colors3.good : Colors3.bad);
 		this.hoverModel.setPosition(pos.x, pos.y, 0);
 		this.hoverModel.setVisible(true);
 	}
@@ -407,6 +473,29 @@ export class GameRenderer {
 		}
 
 		return model;
+	}
+
+	public debugPrintShaders() {
+		const materialProperties: any = this.renderer.properties.get(this.assets.matDefault);
+
+		if (materialProperties.currentProgram) {
+			const gl = this.renderer.getContext();
+			const program = materialProperties.currentProgram.program;
+
+			// Get the array of attached shaders (vertex and fragment)
+			const attachedShaders: any = gl.getAttachedShaders(program);
+
+			attachedShaders.forEach((shader, index) => {
+				const source = gl.getShaderSource(shader);
+				const type = gl.getShaderParameter(shader, gl.SHADER_TYPE);
+
+				if (type === gl.VERTEX_SHADER) {
+					console.log("--- EXPANDED VERTEX SHADER ---", source);
+				} else if (type === gl.FRAGMENT_SHADER) {
+					console.log("--- EXPANDED FRAGMENT SHADER ---", source);
+				}
+			});
+		}
 	}
 }
 

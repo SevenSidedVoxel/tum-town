@@ -5,15 +5,17 @@ import { Frame } from "../game/Frame";
 import { GameAnim } from "../game/GameAnims";
 import { GameState } from "../game/GameState";
 import { GameRenderer } from "../game/GameRenderer";
-import { Tiles } from "../game/Tile";
+import { TileType } from "../game/Tile";
 
 export class GameView implements IView {
 	private ctx: AppCtx;
 	private boardElem: HTMLElement | null | undefined;
 	private actionsElem: HTMLElement | null | undefined;
 	private scoreElem: HTMLElement | null | undefined;
+	private nextItemButton: HTMLElement | null | undefined;
 
 	private game: GameState = new GameState();
+	private selectedItem: TileType | null = null;
 	private renderer: GameRenderer = this.game.renderer;
 
 	public constructor(ctx: AppCtx) {
@@ -44,6 +46,7 @@ export class GameView implements IView {
 		
 		<section id="gameActions" class="game-panel game-actions">
 			<p id="score">Score: <span>0</span></p>
+			<button id="nextItemButton"></button>
 		</section>
 	</div>
 </div>
@@ -67,7 +70,12 @@ export class GameView implements IView {
 		window.addEventListener('pointercancel', this.handlePointerCancel);
 		window.addEventListener('keydown', this.handleKeyPress);
 
+		this.nextItemButton = this.actionsElem.querySelector("#nextItemButton");
+		this.nextItemButton?.addEventListener('click', this.selectNextItem);
+
 		this.game.onScoreUpdate = () => this.updateScore();
+		this.game.setup();
+		this.selectNextItem();
 
 		this.loop(0);
 	}
@@ -90,12 +98,13 @@ export class GameView implements IView {
 	clickTile(pos: P2) {
 		// console.log(`clicked ${pos.name()}`);
 		const tile = this.game.grid.getTile(pos);
-		if (!this.game.canPlaceTile(tile, Tiles.House1)) {
+		if (!this.selectedItem
+			|| !this.game.canPlaceTile(tile, this.selectedItem)) {
 			// Anims.showInvalidAct(tile.Elem);
 			return;
 		}
 
-		this.game.placeTile(tile, Tiles.House1);
+		this.game.placeTile(tile, this.selectedItem);
 		this.playNextAnim();
 
 		this.hoverTileStart(pos);
@@ -108,12 +117,37 @@ export class GameView implements IView {
 	hoverTileStart(pos: P2) {
 		this.hoverPos = pos;
 		const tile = this.game.grid.getTile(this.hoverPos);
-		const canInteract = this.game.canPlaceTile(tile, Tiles.House1);
+		const canInteract = this.selectedItem != null
+			&& this.game.canPlaceTile(tile, this.selectedItem);
 		this.renderer.hoverTile(tile, canInteract);
 	}
 	hoverTileEnd() {
 		this.hoverPos = null;
 		this.renderer.hoverTile(null, false);
+	}
+
+	selectNextItem = () => {
+		if (!this.selectedItem) {
+			// Select the first item
+			this.selectedItem = this.game.items[0]?.type ?? null;
+			this.updateItemDisplay();
+			return;
+		}
+
+		for (let i = 0; i < this.game.items.length; ++i) {
+			const item = this.game.items[i];
+			if (item!.type == this.selectedItem) {
+				// Currently selecting this item. Move selection to next item
+				const nextIndex = (i + 1) % this.game.items.length;
+				this.selectedItem = this.game.items[nextIndex]!.type;
+				this.updateItemDisplay();
+				return;
+			}
+		}
+	}
+	private updateItemDisplay() {
+		if (!this.nextItemButton) return;
+		this.nextItemButton.textContent = `${this.selectedItem?.name ?? 'None'}`;
 	}
 
 	//#region Visual State
@@ -180,6 +214,10 @@ export class GameView implements IView {
 
 	handleKeyPress = (e: KeyboardEvent) => {
 		switch (e.code) {
+			case 'KeyQ':
+				this.selectNextItem();
+				break;
+
 			case 'Comma':
 				if (this.stateDebugAnim) {
 					cancelAnimationFrame(this.stateDebugAnim);

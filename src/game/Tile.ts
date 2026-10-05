@@ -6,7 +6,6 @@ import { float3, color3, quat4, ZAxis, Utils3 } from '../utils/threeUtils';
 import { RandomSlice } from "./SeededRandom";
 import { GameState } from "./GameState";
 import { Rule, MatchFlags } from "./Rule";
-import { RectAreaLightUniformsLib } from "three/examples/jsm/Addons.js";
 
 export class Tile {
 	public pos: P2;
@@ -14,6 +13,7 @@ export class Tile {
 	public draw: TileDraw | null = null;
 	public shouldRegen: boolean = false;
 	public shouldCheck: boolean = false;
+	public actIndex: number = 0;
 
 	constructor(pos: P2, type: TileType) {
 		this.pos = pos;
@@ -59,10 +59,14 @@ export class TileDraw {
 		return new color3(isDark ? Colors.tileDark : Colors.tileLight);
 	}
 
-	getCenterPos(offset: number): float3 {
-		const centerX = this.centerPos.x + this.rng.nextF(-offset, offset);
-		const centerY = this.centerPos.y + this.rng.nextF(-offset, offset);
-		return new float3(centerX, centerY, 0);
+	recalcCenterPos(pos: P2, centerOffset: number | undefined) {
+		const offset = centerOffset ?? 0;
+		this.centerPos.set(
+			pos.x + this.rng.nextF(-offset, offset),
+			pos.y + this.rng.nextF(-offset, offset),
+			0
+		);
+		return this.centerPos;
 	}
 
 	firstTimeBuild() {
@@ -140,7 +144,7 @@ export const Tiles = {
 	},
 
 	House1: {
-		name: "house1",
+		name: "house",
 		color: Colors.tileHouse1,
 		centerOffset: 0.025,
 		place(game, tile) {
@@ -289,12 +293,31 @@ export const Tiles = {
 
 			// Check connected tiles
 			const tileU = game.grid.getTileOffset(tile.pos, +0, +1);
+			const tileL = game.grid.getTileOffset(tile.pos, -1, +0);
 			const tileR = game.grid.getTileOffset(tile.pos, +1, +0);
 			const connectU = isPath(tileU.type);
+			const connectL = isPath(tileL.type);
 			const connectR = isPath(tileR.type);
+
+			let tileUR: Tile | null = null;
+			let connectUR = false;
+			if (!connectU && !connectR) {
+				tileUR = game.grid.getTileOffset(tile.pos, +1, +1);
+				connectUR = isPath(tileUR.type);
+			}
+
+			let tileUL: Tile | null = null;
+			let connectUL = false;
+			if (!connectU && !connectL) {
+				tileUL = game.grid.getTileOffset(tile.pos, -1, +1);
+				connectUL = isPath(tileUL.type);
+			}
+
 			const connectionHash =
 				(connectU ? 0x1 : 0) +
-				(connectR ? 0x2 : 0);
+				(connectR ? 0x2 : 0) +
+				(connectUR ? 0x4 : 0) +
+				(connectUL ? 0x8 : 0);
 
 			if (tile.draw.drawCache["connectionHash"] == connectionHash)
 				return; // Already connected as desired
@@ -318,73 +341,8 @@ export const Tiles = {
 			// Connect to other tiles
 			if (connectU) connectTo(tileU);
 			if (connectR) connectTo(tileR);
-
-			return;
-
-			function connectTo(this, otherTile: Tile) {
-				const targetTile = otherTile;
-				const targetPos = targetTile.getCenterPos();
-
-				buildPath(game, tile, centerPos, targetPos);
-			}
-		}
-	},
-	PathJoin: {
-		name: "path_join",
-		color: Colors.tileRoad2,
-		centerOffset: 0.1,
-		animCreate(game, tile) {
-			if (!tile.draw) return;
-
-			const rng = tile.draw.rng;
-			rng.reset();
-
-			// Update center position
-			const centerPos = tile.draw.centerPos;
-			const offset = this.centerOffset!;
-			centerPos.set(
-				tile.pos.x + rng.nextF(-offset, offset),
-				tile.pos.y + rng.nextF(-offset, offset),
-				0
-			);
-
-			// Check connected tiles
-			const tileU = game.grid.getTileOffset(tile.pos, +0, +1);
-			const tileR = game.grid.getTileOffset(tile.pos, +1, +0);
-			const connectU = isPath(tileU.type);
-			const connectR = isPath(tileR.type);
-			const connectionHash =
-				(connectU ? 0x1 : 0) +
-				(connectR ? 0x2 : 0);
-
-			if (tile.draw.drawCache["connectionHash"] == connectionHash)
-				return; // Already connected as desired
-			tile.draw.drawCache["connectionHash"] = connectionHash;
-
-			// Destroy all the old models (delayed till after creating the new models)
-			if (tile.draw.models.length > 0) {
-				game.addAnim(
-					tile.draw.destroyAllModels(0.01)
-						.delayed(Anims.BaseDur * 0.5)
-				);
-			}
-
-			// Add center stone
-			const size = rng.nextF(0.8, 1);
-
-			const model = game.renderer.growMeshOnTile(
-				game.assets.model_RoadJoin,
-				tile,
-				new color3(this.color),
-				Anims.BaseDur,
-				centerPos,
-				size
-			);
-			model.setName(`${tile.pos.name()}_${tile.type.name}`);
-
-			// Connect to other tiles
-			if (connectU) connectTo(tileU);
-			if (connectR) connectTo(tileR);
+			if (connectUR) connectTo(tileUR!);
+			if (connectUL) connectTo(tileUL!);
 
 			return;
 
@@ -398,8 +356,70 @@ export const Tiles = {
 	},
 	Bridge: { name: "bridge", color: Colors.tileBridge },
 
-	Grass: { name: "grass", color: Colors.tileGrass },
-	Tree: { name: "tree", color: Colors.tileTree1 },
+	Tree: {
+		name: "tree",
+		color: Colors.tileTree1,
+		centerOffset: 0.2,
+		place(game, tile) {
+			game.addScore(tile, 1);
+			game.replaceTile(tile, this);
+		},
+		animCreate(game, tile) {
+			if (!tile.draw) return;
+
+			const rng = tile.draw.rng;
+			rng.reset();
+			const centerPos = tile.draw.recalcCenterPos(tile.pos, this.centerOffset);
+
+			if (!tile.draw.firstTimeBuild())
+				return;
+
+			game.startCombinedAnim();
+			game.renderer.growMeshOnTile(
+				game.assets.model_Tree1,
+				tile,
+				new color3(this.color),
+				Anims.BaseDur,
+				centerPos,
+				new float3().setScalar(rng.nextF(0.9, 1)),
+				Utils3.rotZRad(rng.nextRadians())
+			);
+			game.endAndAddCombinedAnim();
+		},
+	},
+
+	Forest: {
+		name: "forest",
+		color: Colors.tileTree1,
+		centerOffset: 0.05,
+		place(game, tile) {
+			game.addScore(tile, 1);
+			game.replaceTile(tile, this);
+		},
+		animCreate(game, tile) {
+			if (!tile.draw) return;
+
+			const rng = tile.draw.rng;
+			rng.reset();
+			const centerPos = tile.draw.recalcCenterPos(tile.pos, this.centerOffset);
+
+			if (!tile.draw.firstTimeBuild())
+				return;
+
+			game.startCombinedAnim();
+			game.renderer.growMeshOnTile(
+				game.assets.model_Tree2,
+				tile,
+				new color3(this.color),
+				Anims.BaseDur,
+				centerPos,
+				new float3().setScalar(rng.nextF(0.9, 1)),
+				Utils3.rotZRad(rng.nextRadians())
+			);
+			game.endAndAddCombinedAnim();
+		},
+	},
+
 	Water: { name: "water", color: Colors.tileWater },
 } as const satisfies Record<string, TileType>;
 
@@ -480,75 +500,38 @@ export function makeRules(): Rule[] {
 		},
 		MatchFlags.Rotate4));
 
-	rules.push(new Rule("Add Road between Houses",
-		{
-			cc: Tiles.Empty,
-			uc: Tiles.House1,
-			dc: Tiles.House1,
-		},
-		(game, area) => {
-			game.replaceTile(area.cc, Tiles.Path);
-			game.addScore(area.cc, 1);
-		},
-		MatchFlags.Rotate1));
+	// rules.push(new Rule("Add Road between Houses",
+	// 	{
+	// 		cc: Tiles.Empty,
+	// 		uc: Tiles.House1,
+	// 		dc: Tiles.House1,
+	// 	},
+	// 	(game, area) => {
+	// 		game.replaceTile(area.cc, Tiles.Path);
+	// 		game.addScore(area.cc, 1);
+	// 	},
+	// 	MatchFlags.Rotate1));
 
-	rules.push(new Rule("Make Intersection",
+	rules.push(new Rule("Make Forest",
 		{
-			cc: Tiles.Empty,
-			uc: Tiles.Path,
-			dc: Tiles.Path,
-			cl: Tiles.Path,
+			cc: Tiles.Tree,
+			uc: Tiles.Tree,
+			ul: Tiles.Tree,
+			cl: Tiles.Tree,
 		},
 		(game, area) => {
-			game.replaceTile(area.cc, Tiles.PathJoin);
-			game.addScore(area.cc, 4);
-		},
-		MatchFlags.Rotate4));
-	rules.push(new Rule("Upgrade Intersection",
-		{
-			cc: Tiles.Path,
-			uc: Tiles.Path,
-			dc: Tiles.Path,
-			cl: Tiles.Path,
-		},
-		(game, area) => {
-			game.replaceTile(area.cc, Tiles.PathJoin);
-			game.addScore(area.cc, 4);
-		},
-		MatchFlags.Rotate4));
+			// Choose the newest tile to become the forest
+			const tiles = [area.cc, area.uc, area.ul, area.cl];
+			const lastTile = pickLastActIndex(tiles);
 
-	rules.push(new Rule("Make Tree",
-		{
-			cc: Tiles.Grass,
-			uc: Tiles.Grass,
-			ul: Tiles.Grass,
-			cl: Tiles.Grass,
-		},
-		(game, area) => {
-			game.replaceTile(area.cc, Tiles.Tree);
-			game.replaceTile(area.uc, Tiles.Empty);
-			game.replaceTile(area.ul, Tiles.Empty);
-			game.replaceTile(area.cl, Tiles.Empty);
+			game.mergeTilesInto(
+				lastTile,
+				tiles.filter(t => t !== lastTile),
+				Tiles.Forest
+			);
+
 			game.addScore(area.cc, 4);
 			game.addNat(area.cc, 2);
-		},
-		MatchFlags.None));
-
-	rules.push(new Rule("Make Pond",
-		{
-			cc: Tiles.Empty,
-			uc: Tiles.Grass,
-			ul: Tiles.Grass,
-			cl: Tiles.Grass,
-			cr: Tiles.Grass,
-		},
-		(game, area) => {
-			game.replaceTile(area.cc, Tiles.Water);
-			game.replaceTile(area.uc, Tiles.Empty);
-			game.replaceTile(area.ul, Tiles.Empty);
-			game.replaceTile(area.cl, Tiles.Empty);
-			game.replaceTile(area.cr, Tiles.Empty);
-			game.addScore(area.cc, 2);
 		},
 		MatchFlags.None));
 
@@ -556,8 +539,7 @@ export function makeRules(): Rule[] {
 }
 
 export function isPath(type: TileType) {
-	return type == Tiles.Path
-		|| type == Tiles.PathJoin;
+	return type == Tiles.Path;
 }
 
 export function buildPath(
@@ -619,4 +601,13 @@ export function buildPath(
 	game.endAndAddCombinedAnim();
 
 	return pathModels;
+}
+
+function pickLastActIndex(tiles: Tile[]) {
+	let last = tiles[0]!;
+	for (const tile of tiles) {
+		if (tile.actIndex > last.actIndex)
+			last = tile;
+	}
+	return last;
 }

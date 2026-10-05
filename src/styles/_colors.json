@@ -30,6 +30,7 @@
 	"tileRoad2": "#47566f",
 	"tileBridge": "#47566f",
 	"tileWater": "#1a4a71",
-	"tileGrass": "#2b6228",
-	"tileTree1": "#40943d"
+	"tileTree1": "#2b6228",
+	"tileTree2": "#40943d",
+	"tileTree3": "#55b853"
 }

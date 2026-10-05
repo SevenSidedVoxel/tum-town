@@ -3,7 +3,7 @@ import { GameView } from "./views/GameView";
 // import { MainMenuView } from "./views/MainMenuView";
 
 export const BuildTimestamp = __BUILD_TIMESTAMP__;
-export const BuildID = "brioche";
+export const BuildID = "bread";
 
 document.addEventListener("DOMContentLoaded", () => {
 	// Setup root & view

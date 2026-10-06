@@ -359,7 +359,7 @@ export const Tiles = {
 	Tree: {
 		name: "tree",
 		color: Colors.tileTree1,
-		centerOffset: 0.2,
+		centerOffset: 0.1,
 		place(game, tile) {
 			game.addScore(tile, 1);
 			game.replaceTile(tile, this);
@@ -369,11 +369,62 @@ export const Tiles = {
 
 			const rng = tile.draw.rng;
 			rng.reset();
-			const centerPos = tile.draw.recalcCenterPos(tile.pos, this.centerOffset);
 
-			if (!tile.draw.firstTimeBuild())
+			// Check for neighbouring trees and adjust the center to be near other trees
+			const adj = game.grid.getAdj8(tile.pos);
+			const center = new P2(0, 0);
+			let count = 0;
+			function addTileWeight(tile: Tile, x: number, y: number) {
+				let weight = 0;
+				if (tile.type == Tiles.Tree)
+					weight = 1;
+				if (tile.type == Tiles.Forest)
+					weight = 2;
+
+				weight *= 2 / (1 + x * x + y * y);
+
+				if (weight == 0) return;
+				center.addXY(x * weight, y * weight);
+				count++;
+			}
+			addTileWeight(adj.ul, -1, +1);
+			addTileWeight(adj.uc, +0, +1);
+			addTileWeight(adj.ur, +1, +1);
+			addTileWeight(adj.cl, -1, +0);
+			addTileWeight(adj.cr, +1, +0);
+			addTileWeight(adj.dl, -1, -1);
+			addTileWeight(adj.dc, +0, -1);
+			addTileWeight(adj.dr, +1, -1);
+			if (count != 0) {
+				center.mulS(1.0 / count);
+				center.clampXY(
+					-1, 1,
+					-1, 1
+				);
+				center.mulXY(0.2, 0.2);
+			}
+			const centerPos = new float3(center.x, center.y, 0)
+				.add({ x: tile.pos.x, y: tile.pos.y, z: 0 });
+
+			// Add random offset
+			const offset = this.centerOffset ?? 0;
+			centerPos.x += tile.draw.rng.nextF(-offset, offset);
+			centerPos.y += tile.draw.rng.nextF(-offset, offset);
+
+			if (!tile.draw.firstTimeBuild()) {
+				if (tile.draw.models.length > 0
+					&& !tile.draw.centerPos.equals(centerPos)) {
+					tile.draw.centerPos.copy(centerPos);
+					// Move the model towards the center pos
+					game.addAnim(Anims.moveModel(
+						tile.draw.models[0]!,
+						tile.draw.centerPos
+					));
+				}
 				return;
+			}
 
+			tile.draw.centerPos = centerPos;
 			game.startCombinedAnim();
 			game.renderer.growMeshOnTile(
 				game.assets.model_Tree1,
@@ -512,6 +563,26 @@ export function makeRules(): Rule[] {
 	// 	},
 	// 	MatchFlags.Rotate1));
 
+	rules.push(new Rule("Make Forest X",
+		{
+			cc: Tiles.Tree,
+			ul: Tiles.Tree,
+			ur: Tiles.Tree,
+			dl: Tiles.Tree,
+			dr: Tiles.Tree,
+		},
+		(game, area) => {
+			// Choose the newest tile to become the forest
+			game.mergeTilesInto(
+				area.cc,
+				[area.ul, area.ur, area.dl, area.dr],
+				Tiles.Forest
+			);
+
+			game.addScore(area.cc, 4);
+			game.addNat(area.cc, 2);
+		},
+		MatchFlags.None));
 	rules.push(new Rule("Make Forest",
 		{
 			cc: Tiles.Tree,
@@ -530,8 +601,8 @@ export function makeRules(): Rule[] {
 				Tiles.Forest
 			);
 
-			game.addScore(area.cc, 4);
-			game.addNat(area.cc, 2);
+			game.addScore(lastTile, 4);
+			game.addNat(lastTile, 2);
 		},
 		MatchFlags.None));
 

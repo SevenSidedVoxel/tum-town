@@ -47,6 +47,23 @@ export class Area3x3 {
 	}
 }
 
+export class Adj4 {
+	constructor(
+		public uc: Tile,
+		public dc: Tile,
+		public cl: Tile,
+		public cr: Tile,
+	) { }
+}
+
+export class Adj8 {
+	constructor(
+		public ul: Tile, public uc: Tile, public ur: Tile,
+		public cl: Tile, public cr: Tile,
+		public dl: Tile, public dc: Tile, public dr: Tile
+	) { }
+}
+
 export enum MatchFlags {
 	None = 0x0,
 

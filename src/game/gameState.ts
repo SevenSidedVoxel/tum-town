@@ -3,7 +3,7 @@ import { Anims, GameAnim } from "./GameAnims";
 import { makeRules, Tiles, TileType, Tile } from "./Tile";
 import { GameRenderer } from "./GameRenderer";
 import { RandomSlice } from "./SeededRandom";
-import { Area3x3, isTile, MatchFlags, Rule } from "./Rule";
+import { Adj4, Adj8, Area3x3, isTile, MatchFlags, Rule } from "./Rule";
 
 export class GameState {
 	public score: number = 0;
@@ -410,6 +410,26 @@ class Grid {
 
 	public getTileOffset(pos: P2, x: number, y: number): Tile {
 		return this.getTile(pos.x + x, pos.y + y);
+	}
+
+	public getAdj4(pos: P2): Adj4 {
+		const uc = this.getTileOffset(pos, +0, +1);
+		const dc = this.getTileOffset(pos, +0, -1);
+		const cl = this.getTileOffset(pos, -1, +0);
+		const cr = this.getTileOffset(pos, +1, +0);
+		return { uc, dc, cl, cr };
+	}
+
+	public getAdj8(pos: P2): Adj8 {
+		const ul = this.getTileOffset(pos, -1, +1);
+		const uc = this.getTileOffset(pos, +0, +1);
+		const ur = this.getTileOffset(pos, +1, +1);
+		const cl = this.getTileOffset(pos, -1, +0);
+		const cr = this.getTileOffset(pos, +1, +0);
+		const dl = this.getTileOffset(pos, -1, -1);
+		const dc = this.getTileOffset(pos, +0, -1);
+		const dr = this.getTileOffset(pos, +1, -1);
+		return { ul, uc, ur, cl, cr, dl, dc, dr };
 	}
 
 	public getTile(pos: P2): Tile;

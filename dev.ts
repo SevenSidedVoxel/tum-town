@@ -1,5 +1,5 @@
 import { Glob, serve, ServerWebSocket } from "bun";
-import { cpSync, watch } from "fs";
+import { cpSync, existsSync, readdirSync, watch } from "fs";
 import { join, resolve } from "path";
 
 const PORT = 3000;
@@ -53,7 +53,20 @@ async function buildProject() {
 	}
 
 	// Copy Assets
-	cpSync(`${SRC_DIR}/data`, `${DIST_DIR}/data`, { recursive: true });
+	const rootDir = join(SRC_DIR, "_root");
+	if (existsSync(rootDir)) {
+		const entries = readdirSync(rootDir, { withFileTypes: true });
+		for (const entry of entries) {
+			const srcPath = join(rootDir, entry.name);
+			const destPath = join(DIST_DIR, entry.name);
+			cpSync(srcPath, destPath, { recursive: true });
+		}
+	}
+
+	const dataDir = join(SRC_DIR, "data");
+	if (existsSync(dataDir)) {
+		cpSync(dataDir, join(DIST_DIR, "data"), { recursive: true });
+	}
 	console.log(`✨ Recompiled into ${DIST_DIR} at ${new Date().toLocaleTimeString()}`);
 	isBuilding = false;
 }

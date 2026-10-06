@@ -22,6 +22,40 @@ export class P2 {
 
 	public toString() { return `(${this.x}, ${this.y})`; }
 	public name() { return `${coordToLetter(this.x)}${this.y}`; }
+
+	public addXY(x: number, y: number) {
+		this.x += x;
+		this.y += y;
+	}
+
+	public mulS(s: number) {
+		this.x *= s;
+		this.y *= s;
+	}
+	public mulXY(x: number, y: number) {
+		this.x *= x;
+		this.y *= y;
+	}
+
+	public len2() { return this.x * this.x + this.y * this.y; }
+	public len() { return Math.sqrt(this.len2()); }
+	public normalize() {
+		const len = this.len();
+		if (len == 0)
+			return;
+
+		const inv = 1.0 / len;
+		this.x *= inv;
+		this.y *= inv;
+	}
+
+	public clampXY(
+		xMin: number, xMax: number,
+		yMin: number, yMax: number
+	) {
+		this.x = Math.min(xMax, Math.max(xMin, this.x));
+		this.y = Math.min(yMax, Math.max(yMin, this.y));
+	}
 }
 
 export function lerp(a: number, b: number, t: number) {

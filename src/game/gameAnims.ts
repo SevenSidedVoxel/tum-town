@@ -171,6 +171,27 @@ export namespace Anims {
 		});
 	}
 
+	export function moveModel(
+		model: BatchedInstance,
+		position: float3,
+		duration: number = Anims.BaseDur): GameAnim {
+		let initPos = new float3();
+		const targetPos = position.clone();
+		return new GameAnim({
+			name: moveModel.name,
+			duration: duration,
+			start: function () {
+				initPos.copy(model.position);
+			},
+			update: function (dt) {
+				const [t, s] = this.lil();
+				model.position.copy(initPos);
+				model.position.lerp(targetPos, t);
+				model.updateMatrix();
+			},
+		});
+	}
+
 	export function destroyModel(
 		model: BatchedInstance,
 		duration: number = Anims.BaseDur): GameAnim {

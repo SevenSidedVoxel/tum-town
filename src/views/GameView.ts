@@ -1,4 +1,3 @@
-import { BuildID, BuildTimestamp } from "..";
 import { IView, AppCtx } from "../AppCtx";
 import { P2 } from "../game/P2";
 import { Frame } from "../game/Frame";
@@ -6,6 +5,9 @@ import { GameAnim } from "../game/GameAnims";
 import { GameState } from "../game/GameState";
 import { GameRenderer } from "../game/GameRenderer";
 import { TileType } from "../game/Tile";
+
+export const BuildTimestamp = __BUILD_TIMESTAMP__;
+export const BuildID = "bright";
 
 export class GameView implements IView {
 	private ctx: AppCtx;

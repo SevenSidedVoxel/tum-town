@@ -133,8 +133,8 @@ export class GameRenderer {
 		this.assets.matDefault = new THREE.MeshStandardMaterial({
 			map: this.assets.texPalette, // color palette
 			// color: 0xFFFFFF, // tint
-			roughness: 0.5,
-			metalness: 0.1,
+			roughness: 0.8,
+			metalness: 0.01,
 		});
 		this.assets.matDefault.onBeforeCompile = (shader) => {
 			// Add varying: vInstanceColor
@@ -221,9 +221,9 @@ else
 
 		// Lighting
 		{
-			this.scene.add(new THREE.AmbientLight(0xFFFFFF, 1));
+			this.scene.add(new THREE.AmbientLight(0xFFFFFF, 2));
 
-			const sun = new THREE.DirectionalLight(0xFFFFFF, 1);
+			const sun = new THREE.DirectionalLight(0xefcdc7, 2);
 			sun.castShadow = true;
 			sun.position.set(10, 20, 20);
 			sun.shadow.mapSize.width = 2048;

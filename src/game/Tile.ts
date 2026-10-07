@@ -166,8 +166,8 @@ export const Tiles = {
 			const centerPos = tile.draw.centerPos;
 
 			// Calculate house model vars
-			const houseSize = rng.nextF(0.9, 1);
-			const houseZRad = rng.nextRadians();
+			const houseSize = rng.nextF(0.7, 0.8);
+			const zDeg = rng.nextDegSnapped(30);
 
 			// Connect to adjacent path
 			connectPathToAdj(game, tile);
@@ -181,7 +181,7 @@ export const Tiles = {
 					Anims.BaseDur,
 					centerPos,
 					new float3(houseSize, houseSize, houseSize),
-					Utils3.rotZRad(houseZRad)
+					Utils3.rotZDeg(zDeg)
 				);
 			}
 
@@ -201,7 +201,7 @@ export const Tiles = {
 			const offset = this.centerOffset ?? 0;
 			tile.draw.centerPos.set(
 				tile.pos.x + rng.nextF(-offset, offset),
-				tile.pos.y + rng.nextF(-offset, offset),
+				tile.pos.y - 0.1 + rng.nextF(-offset, offset),
 				0
 			);
 			const centerPos = tile.draw.centerPos;
@@ -379,7 +379,7 @@ export const Tiles = {
 				if (tile.type == Tiles.Tree)
 					weight = 1;
 				if (tile.type == Tiles.Forest)
-					weight = 2;
+					weight = 1.5;
 
 				weight *= 2 / (1 + x * x + y * y);
 
@@ -403,7 +403,7 @@ export const Tiles = {
 				);
 				center.mulXY(0.2, 0.2);
 			}
-			const centerPos = new float3(center.x, center.y, 0)
+			const centerPos = new float3(center.x, center.y - 0.1, 0)
 				.add({ x: tile.pos.x, y: tile.pos.y, z: 0 });
 
 			// Add random offset

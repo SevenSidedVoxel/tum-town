@@ -148,10 +148,13 @@ varying vec2 vUv;
 			// Add varying vInstanceColor to vertex shader
 			shader.vertexShader = shader.vertexShader.replace(
 				'#include <begin_vertex>',
-				/*glsl*/`
+				`
 #include <begin_vertex>
 
+// UV
 vUv = uv;
+
+// Instance Color
 vInstanceColor = vec3(1, 1, 1);
 #ifdef USE_INSTANCING_COLOR
 	vInstanceColor = instanceColor.rgb;
@@ -160,6 +163,29 @@ vInstanceColor = vec3(1, 1, 1);
 	vInstanceColor = getBatchingColor(getIndirectIndex(gl_DrawID)).rgb;
 #endif
 `
+			);
+
+			shader.vertexShader = shader.vertexShader.replace(
+				`#include <project_vertex>`,
+				`
+vec4 mvPosition = vec4(transformed, 1.0);
+mvPosition.xy *= (vec2(1, 1) + 1.25 * mvPosition.z);
+
+// Apply instancing transforms
+#ifdef USE_BATCHING
+	mvPosition = batchingMatrix * mvPosition;
+#endif
+#ifdef USE_INSTANCING
+	mvPosition = instanceMatrix * mvPosition;
+#endif
+
+mvPosition = modelMatrix * mvPosition;
+mvPosition.y += 0.6 * mvPosition.z;
+
+mvPosition = viewMatrix * mvPosition;
+
+gl_Position = projectionMatrix * mvPosition;
+  `
 			);
 
 			// Add varying vInstanceColor to vertex shader

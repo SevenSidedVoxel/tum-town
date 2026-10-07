@@ -220,6 +220,10 @@ export class GameView implements IView {
 				this.selectNextItem();
 				break;
 
+			case 'KeyT':
+				this.game.renderer.debugPrintShaders();
+				break;
+
 			case 'Comma':
 				if (this.stateDebugAnim) {
 					cancelAnimationFrame(this.stateDebugAnim);

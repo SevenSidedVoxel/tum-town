@@ -42,6 +42,15 @@ export class RandomSlice {
 	public nextRadians(): number {
 		return this.next01() * 2 * Math.PI;
 	}
+	public nextDeg(): number {
+		return this.next01() * 360;
+	}
+	public nextDegSnapped(
+		snap: number,
+		steps: number = Math.round(360 / snap)
+	): number {
+		return snap * Math.floor(this.next01() * steps);
+	}
 
 	public nextP2() { return new P2(this.next01(), this.next01()); }
 	public nextF2() { return new float2(this.next01(), this.next01()); }

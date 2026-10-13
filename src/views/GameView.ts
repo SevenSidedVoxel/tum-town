@@ -7,12 +7,12 @@ import { GameRenderer } from "../game/GameRenderer";
 import { TileType } from "../game/Tile";
 
 export const BuildTimestamp = __BUILD_TIMESTAMP__;
-export const BuildID = "bright";
+export const BuildID = "brilliant";
 
 export class GameView implements IView {
 	private ctx: AppCtx;
 	private boardElem: HTMLElement | null | undefined;
-	private actionsElem: HTMLElement | null | undefined;
+	private gameActionsElem: HTMLElement | null | undefined;
 	private scoreElem: HTMLElement | null | undefined;
 	private nextItemButton: HTMLElement | null | undefined;
 
@@ -47,7 +47,14 @@ export class GameView implements IView {
 		</section>
 		
 		<section id="gameActions" class="game-panel game-actions">
-			<p id="score">Score: <span>0</span></p>
+			<div class="game-actions-row">
+				<button id="resetGameButton" class="button-icon icon-reset icon-20s"></button>
+				<div class="game-actions-spacer"></div>
+				<div id="scoreMeter" class="meter-bar"></div>
+				<div class="game-actions-spacer"></div>
+				<div class="button-icon icon-20s"></div>
+				<!--<button id="undoGameButton" class="button-icon icon-reset icon-20s"></button>-->
+			</div>
 			<button id="nextItemButton"></button>
 		</section>
 	</div>
@@ -60,26 +67,41 @@ export class GameView implements IView {
 		// Setup renderer
 		this.renderer.setupAsync(this.boardElem, this.game);
 
-		this.actionsElem = ctx.root.querySelector("#gameActions");
-		if (this.actionsElem == null) return;
+		// Get required elements
+		this.gameActionsElem = ctx.root.querySelector("#gameActions");
+		if (this.gameActionsElem == null) return;
+		this.nextItemButton = this.gameActionsElem.querySelector("#nextItemButton");
 
-		this.scoreElem = this.actionsElem.querySelector("#score>span");
-		if (this.scoreElem == null) return;
+		// Setup Game State
+		this.game.setup();
+		this.selectNextItem();
 
+		// Connect Game Listeners
+		this.game.score.meterElem = this.gameActionsElem.querySelector("#scoreMeter");
+		this.game.score.updateVisuals();
+
+		// Add button click handlers
 		window.addEventListener('pointermove', this.handlePointerMove);
 		window.addEventListener('pointerdown', this.handlePointerDown);
 		window.addEventListener('pointerup', this.handlePointerUp);
 		window.addEventListener('pointercancel', this.handlePointerCancel);
 		window.addEventListener('keydown', this.handleKeyPress);
 
-		this.nextItemButton = this.actionsElem.querySelector("#nextItemButton");
+		addClick("#resetGameButton", this.resetGame);
 		this.nextItemButton?.addEventListener('click', this.selectNextItem);
 
-		this.game.onScoreUpdate = () => this.updateScore();
-		this.game.setup();
-		this.selectNextItem();
-
+		// Start Game Loop
 		this.loop(0);
+
+		function addClick(
+			query: string,
+			handler: EventListenerOrEventListenerObject
+		) {
+			ctx.root.querySelectorAll(query)
+				.forEach(elem => {
+					elem.addEventListener('click', handler);
+				});
+		}
 	}
 
 	exit(ctx): void { }
@@ -97,19 +119,31 @@ export class GameView implements IView {
 		requestAnimationFrame(timestamp => this.loop(timestamp));
 	}
 
+	resetGame = () => {
+		this.game.reset();
+		this.playNextAnim();
+	}
+
 	clickTile(pos: P2) {
 		// console.log(`clicked ${pos.name()}`);
 		const tile = this.game.grid.getTile(pos);
-		if (!this.selectedItem
-			|| !this.game.canPlaceTile(tile, this.selectedItem)) {
-			// Anims.showInvalidAct(tile.Elem);
+		if (this.selectedItem
+			&& this.game.canPlaceTile(tile, this.selectedItem)) {
+
+			this.game.placeTile(tile, this.selectedItem);
+			this.playNextAnim();
+
+			this.hoverTileStart(pos);
 			return;
 		}
 
-		this.game.placeTile(tile, this.selectedItem);
-		this.playNextAnim();
+		if (this.game.tryInteractTile(tile)) {
+			this.playNextAnim();
+			this.hoverTileStart(pos);
+			return;
+		}
 
-		this.hoverTileStart(pos);
+		// Anims.showInvalidAct(tile.Elem);
 	}
 	dragTile(start: P2, end: P2) {
 		// console.log(`drag ${start.name()} to ${end.name()}`);
@@ -121,11 +155,11 @@ export class GameView implements IView {
 		const tile = this.game.grid.getTile(this.hoverPos);
 		const canInteract = this.selectedItem != null
 			&& this.game.canPlaceTile(tile, this.selectedItem);
-		this.renderer.hoverTile(tile, canInteract);
+		this.renderer.hoverTile(tile, canInteract, this.selectedItem);
 	}
 	hoverTileEnd() {
 		this.hoverPos = null;
-		this.renderer.hoverTile(null, false);
+		this.renderer.hoverTile(null, false, null);
 	}
 
 	selectNextItem = () => {
@@ -148,6 +182,10 @@ export class GameView implements IView {
 		}
 	}
 	private updateItemDisplay() {
+		// Retrigger hovering to update preview model
+		if (this.hoverPos)
+			this.hoverTileStart(this.hoverPos);
+
 		if (!this.nextItemButton) return;
 		this.nextItemButton.textContent = `${this.selectedItem?.name ?? 'None'}`;
 	}

@@ -100,6 +100,25 @@
 	user-select: none;
 }
 
+.game-actions-row {
+	width: 100%;
+	margin-bottom: 20px;
+
+	display: flex;
+	flex-direction: row;
+	align-items: center;
+	justify-content: center;
+	gap: 10px;
+}
+
+.game-actions-spacer {
+	flex: 1;
+}
+
+.game-actions>*>p {
+	margin-bottom: 0px;
+}
+
 .game-board {
 	grid-area: a_board;
 	aspect-ratio: 1/1;
@@ -113,4 +132,16 @@
 	-webkit-user-drag: none;
 	user-select: none;
 	touch-action: none;
+}
+
+.meter-bar {
+	width: 100px;
+
+	background-color: var(--col-bgDark);
+
+	padding: 5px;
+	border: 1px solid var(--col-border);
+	border-radius: 6px;
+
+	text-align: center;
 }

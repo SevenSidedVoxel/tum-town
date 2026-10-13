@@ -2,7 +2,18 @@ import { Colors, Colors3 } from "../styles/colors";
 import { color3, float3, quat4 } from "../utils/threeUtils";
 import { BatchedInstance } from "./GameRenderer";
 import { GameState } from "./GameState";
-import { lerp, P2 } from "./P2";
+import { clamp01, lerp, P2 } from "./P2";
+
+export class Ease {
+	public static popIn(t: number) { return 2.5 * t - 1.5 * t * t; }
+	public static popOut(t: number) { return 1.6 * t * t - 0.6 * t; }
+	public static popInOut(t: number) {
+		const l = 1 - clamp01(2 * t - 0.5);
+		const a = 3 * t - 2 * t * t;
+		const b = 4 * (t * t - t);
+		return a + b * l;
+	}
+}
 
 export class GameAnim {
 	private static _nextID = 0;
@@ -38,6 +49,13 @@ export class GameAnim {
 	public start: (() => void) | undefined;
 	public update: ((deltaTime: number) => void) | undefined;
 	public end: (() => void) | undefined;
+
+	public skip(): void {
+		this.delay = 0;
+		this.time = this.duration;
+		this.start?.call(this);
+		this.end?.call(this);
+	}
 
 	public tick(deltaTime: number) {
 		if (this.delay > 0) {
@@ -99,7 +117,8 @@ export namespace Anims {
 			duration: duration,
 			update: function (dt) {
 				const [t, s] = this.lil();
-				model.setScale(lerp(initialSize, targetSize, t));
+				const p = Ease.popIn(t);
+				model.setScale(lerp(initialSize, targetSize, p));
 			},
 		});
 	}
@@ -128,8 +147,9 @@ export namespace Anims {
 				model.position.lerp(targetPos, l);
 
 				// Grow
+				const p = Ease.popIn(t);
 				model.scale.copy(initScale);
-				model.scale.lerp(targetScale, l);
+				model.scale.lerp(targetScale, p);
 
 				// Flush
 				model.updateMatrix();
@@ -162,8 +182,10 @@ export namespace Anims {
 				model.position.lerp(targetPos, l);
 				model.rotation.copy(initRot);
 				model.rotation.slerp(targetRot, l);
+
+				const p = Ease.popIn(t);
 				model.scale.copy(initScale);
-				model.scale.lerp(targetScale, l);
+				model.scale.lerp(targetScale, p);
 
 				// Flush
 				model.updateMatrix();
@@ -185,8 +207,9 @@ export namespace Anims {
 			},
 			update: function (dt) {
 				const [t, s] = this.lil();
+				const l = Ease.popOut(t);
 				model.position.copy(initPos);
-				model.position.lerp(targetPos, t);
+				model.position.lerp(targetPos, l);
 				model.updateMatrix();
 			},
 		});
@@ -269,7 +292,7 @@ export namespace Anims {
 		duration: number = 2 * Anims.BaseDur): GameAnim {
 		const initialPos = new float3(pos.x, pos.y, 1);
 		const model = game.renderer.addModel(
-			game.assets.model_RoadJoin,
+			game.assets.model_LineCap,
 			new float3(pos.x, pos.y, 1),
 			0,
 			Colors3.white);

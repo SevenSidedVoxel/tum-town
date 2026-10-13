@@ -2,7 +2,7 @@ import { Glob, serve, ServerWebSocket } from "bun";
 import { cpSync, existsSync, readdirSync, watch } from "fs";
 import { join, resolve } from "path";
 
-const PORT = 3000;
+const PORT = 4242;
 const DIST_DIR = "./dist";
 const SRC_DIR = "./src";
 

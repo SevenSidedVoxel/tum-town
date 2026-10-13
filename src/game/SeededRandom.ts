@@ -36,6 +36,9 @@ export class RandomSlice {
 		return value;
 	}
 
+	public nextI(min: number = 0, max: number = 1): number {
+		return Math.floor(min + (max - min) * this.next01());
+	}
 	public nextF(min: number = 0, max: number = 1): number {
 		return min + (max - min) * this.next01();
 	}
@@ -56,6 +59,10 @@ export class RandomSlice {
 	public nextF2() { return new float2(this.next01(), this.next01()); }
 	public nextF3() { return new float3(this.next01(), this.next01(), this.next01()); }
 	public nextF4() { return new float4(this.next01(), this.next01(), this.next01(), this.next01()); }
+
+	public choose<T>(options: T[]): T {
+		return options[Math.floor(this.next01() * options.length)]!;
+	}
 
 	public slice(seed: number);
 	public slice(next: number, step: number);

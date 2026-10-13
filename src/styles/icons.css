@@ -1,0 +1,75 @@
+:root {
+	--img-icons: url('../data/graphics.png');
+	--img-icons-size: 1024px;
+}
+
+
+.button-icon {
+	padding: 0px;
+	border: none;
+	background: none;
+
+	position: relative;
+	aspect-ratio: 1/1;
+
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.icon {
+	container-type: size;
+	display: inline-block;
+	position: relative;
+	aspect-ratio: 1/1;
+}
+
+.button-icon::after,
+.icon::after {
+	content: '';
+	position: absolute;
+	inset: 0;
+
+	background-color: currentColor;
+
+	mask-image: var(--img-icons);
+	mask-repeat: no-repeat;
+	mask-size:
+		calc(var(--img-icons-size) * var(--sz)) calc(var(--img-icons-size) * var(--sz));
+	mask-position:
+		calc(-1 * var(--icon-size) * var(--icon-x) * var(--sz)) calc(-1 * var(--icon-size) * var(--icon-y) * var(--sz));
+}
+
+.icon-10s {
+	--size: 1em;
+	width: var(--size);
+	height: var(--size);
+	--sz: calc(var(--size) / var(--icon-size));
+}
+
+.icon-15s {
+	--size: 1.5em;
+	width: var(--size);
+	height: var(--size);
+	--sz: calc(var(--size) / var(--icon-size));
+}
+
+.icon-20s {
+	--size: 2em;
+	width: var(--size);
+	height: var(--size);
+	--sz: calc(var(--size) / var(--icon-size));
+}
+
+.icon-32 {
+	--size: 32px;
+	width: var(--size);
+	height: var(--size);
+	--sz: calc(var(--size) / var(--icon-size));
+}
+
+.icon-reset {
+	--icon-size: 64px;
+	--icon-x: 8;
+	--icon-y: 14;
+}

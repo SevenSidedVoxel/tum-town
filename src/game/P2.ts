@@ -23,18 +23,52 @@ export class P2 {
 	public toString() { return `(${this.x}, ${this.y})`; }
 	public name() { return `${coordToLetter(this.x)}${this.y}`; }
 
+	public addS(s: number) {
+		this.x += s;
+		this.y += s;
+		return this;
+	}
 	public addXY(x: number, y: number) {
 		this.x += x;
 		this.y += y;
+		return this;
+	}
+	public addV(v: P2) {
+		this.x += v.x;
+		this.y += v.y;
+		return this;
+	}
+
+	public subS(s: number) {
+		this.x -= s;
+		this.y -= s;
+		return this;
+	}
+	public subXY(x: number, y: number) {
+		this.x -= x;
+		this.y -= y;
+		return this;
+	}
+	public subV(v: P2) {
+		this.x -= v.x;
+		this.y -= v.y;
+		return this;
 	}
 
 	public mulS(s: number) {
 		this.x *= s;
 		this.y *= s;
+		return this;
 	}
 	public mulXY(x: number, y: number) {
 		this.x *= x;
 		this.y *= y;
+		return this;
+	}
+	public mulV(v: P2) {
+		this.x *= v.x;
+		this.y *= v.y;
+		return this;
 	}
 
 	public len2() { return this.x * this.x + this.y * this.y; }
@@ -62,3 +96,7 @@ export function lerp(a: number, b: number, t: number) {
 	return a + (b - a) * t;
 }
 
+export function clamp01(x: number) { return clamp(x, 0, 1); }
+export function clamp(x: number, min: number, max: number) {
+	return Math.min(max, Math.max(min, x));
+}

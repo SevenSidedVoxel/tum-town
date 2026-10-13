@@ -1,12 +1,18 @@
 import { P2 } from "./P2";
 import { Anims, GameAnim } from "./GameAnims";
-import { makeRules, Tiles, TileType, Tile } from "./Tile";
+import { TileType, Tile } from "./Tile";
+import { Tiles } from "./_tiles_";
+import { makeRules } from "./_rules_";
 import { GameRenderer } from "./GameRenderer";
 import { RandomSlice } from "./SeededRandom";
-import { Adj4, Adj8, Area3x3, isTile, MatchFlags, Rule } from "./Rule";
+import { Area3x3, isTile, MatchFlags, Rule } from "./Rule";
+import { ProgressionMeter } from "./ProgressionMeter";
+import { Grid } from "./Grid";
+import { Item } from "./Item";
 
 export class GameState {
-	public score: number = 0;
+	public score!: ProgressionMeter;
+
 	public population: number = 0;
 	public nature: number = 0;
 	private _actIndex: number = 0;
@@ -26,9 +32,32 @@ export class GameState {
 	public setup() {
 		this._actIndex = 0;
 
+		this.score = new ProgressionMeter(0, 0, 0);
+		this.advanceScoreProgression();
+
+		this.population = 0;
+		this.nature = 0;
+
+		this.isCreative = true;
 		this.addItem(Tiles.House1, 1);
 		this.addItem(Tiles.Path, 1);
 		this.addItem(Tiles.Tree, 1);
+	}
+
+	public reset() {
+		// reset grid
+		for (const tile of this.grid.tiles) {
+			tile.reset();
+		}
+
+		this.regenVisuals();
+		// this.skipAnims();
+		this.setup();
+	}
+
+	public skipAnims() {
+		this.anims.forEach(anim => anim.skip());
+		this.anims.length = 0;
 	}
 
 	//#endregion Setup
@@ -81,13 +110,45 @@ export class GameState {
 
 	//#endregion Visuals
 
+	//#region Progression
+
+	private advanceScoreProgression() {
+		let progress = this.score;
+		progress.id++;
+		progress.startValue = progress.endValue;
+
+		switch (progress.id) {
+			case 1: progress.endValue = 8; break;
+			case 2: progress.endValue = 15; break;
+			case 3: progress.endValue = 30; break;
+			case 4: progress.endValue = 45; break;
+			case 5: progress.endValue = 60; break;
+			case 6: progress.endValue = 90; break;
+			case 7: progress.endValue = 120; break;
+			case 8: progress.endValue = 150; break;
+			case 9: progress.endValue = 180; break;
+			case 10: progress.endValue = 210; break;
+			case 11: progress.endValue = 240; break;
+			case 12: progress.endValue = 270; break;
+			case 13: progress.endValue = 300; break;
+			default:
+				progress.endValue += 50;
+				break;
+		}
+	}
+
+	//#endregion Progression
+
 	//#region State Modification
 
 	public onScoreUpdate: undefined | (() => void);
 
 	public addScore(tile: Tile, s: number) {
-		this.score += s;
-		this.onScoreUpdate?.();
+		this.score.value += s;
+		if (this.score.value >= this.score.endValue) {
+			this.advanceScoreProgression();
+		}
+		this.score.updateVisuals();
 		return Anims.addCount(this, tile.pos, s);
 	}
 
@@ -101,12 +162,13 @@ export class GameState {
 		return Anims.addCount(this, tile.pos, n);
 	}
 
-	private setTileType(tile: Tile, type: TileType) {
+	private setTileType(tile: Tile, type: TileType, rot: number | null = null) {
 		if (tile.type === type)
 			return;
 
 		console.log(`Setting ${tile.pos.name()} to '${type.name}'`);
 		tile.type = type;
+		tile.rot = rot;
 		tile.shouldRegen = true;
 		tile.actIndex = ++this._actIndex;
 
@@ -117,18 +179,16 @@ export class GameState {
 			tile.draw.drawCache = {};
 	}
 
-	public replaceTile(tile: Tile, type: TileType) {
+	public replaceTile(tile: Tile, type: TileType, rot: number | null = null) {
+		// Update Data
+		this.setTileType(tile, type, rot);
+
 		if (type == Tiles.Empty || tile.type == Tiles.Empty) {
 			// Tile is already empty or becoming empty,
 			//   so just use a single animation
-			this.setTileType(tile, type);
-
 			tile.regen(this);
 			return;
 		}
-
-		// Update Data
-		this.setTileType(tile, type);
 
 		// Animate the replacement of tile models
 		if (tile.type.animCreate) {
@@ -140,11 +200,12 @@ export class GameState {
 	public mergeTilesInto(
 		targetTile: Tile,
 		tiles: Tile[],
-		type: TileType) {
+		type: TileType,
+		rot: number | null = null) {
 		// Update Data
 		for (const tile of tiles)
-			this.setTileType(tile, Tiles.Empty);
-		this.setTileType(targetTile, type);
+			this.setTileType(tile, Tiles.Empty, null);
+		this.setTileType(targetTile, type, rot);
 
 		// Update Visuals
 		if (!targetTile.draw) return;
@@ -251,6 +312,16 @@ export class GameState {
 		this.regenVisuals();
 	}
 
+	public tryInteractTile(tile: Tile) {
+		if (tile.type.interact) {
+			tile.type.interact(this, tile);
+			this.regenVisuals();
+			return true;
+		}
+
+		return false;
+	}
+
 	private tilesToCheck: number = 0;
 
 	public markForCheck(x: number, y: number) {
@@ -301,6 +372,7 @@ export class GameState {
 		let ruleIndex = Number.MAX_SAFE_INTEGER;
 		let ruleToApply: Rule | null = null;
 		let areaToApply: Area3x3 | null = null;
+		let rotToApply = 0;
 
 		// Check all tiles that require checking
 		for (const cc of this.grid.tiles) {
@@ -319,9 +391,9 @@ export class GameState {
 			const br = this.grid.getTile(pos.x + 1, pos.y - 1);
 
 			let rot000 = new Area3x3(tl, tc, tr, cl, cc, cr, bl, bc, br);
-			let rot090 = new Area3x3(tr, cr, br, tc, cc, bc, tl, cl, bl);
+			let rot090 = new Area3x3(bl, cl, tl, bc, cc, tc, br, cr, tr);
 			let rot180 = new Area3x3(br, bc, bl, cr, cc, cl, tr, tc, tl);
-			let rot270 = new Area3x3(bl, cl, tl, bc, cc, tc, br, cr, tr);
+			let rot270 = new Area3x3(tr, cr, br, tc, cc, bc, tl, cl, bl);
 
 			// Search through rules
 			for (const [index, rule] of this.rules.entries()) {
@@ -338,6 +410,7 @@ export class GameState {
 					examinedAllRules = false;
 					ruleToApply = rule;
 					areaToApply = rot000;
+					rotToApply = 0;
 					ruleIndex = index;
 					break;
 				}
@@ -348,6 +421,7 @@ export class GameState {
 						examinedAllRules = false;
 						ruleToApply = rule;
 						areaToApply = rot090;
+						rotToApply = 90;
 						ruleIndex = index;
 						break;
 					}
@@ -358,6 +432,7 @@ export class GameState {
 						examinedAllRules = false;
 						ruleToApply = rule;
 						areaToApply = rot180;
+						rotToApply = 180;
 						ruleIndex = index;
 						break;
 					}
@@ -366,6 +441,7 @@ export class GameState {
 						examinedAllRules = false;
 						ruleToApply = rule;
 						areaToApply = rot270;
+						rotToApply = 270;
 						ruleIndex = index;
 						break;
 					}
@@ -380,81 +456,11 @@ export class GameState {
 		// If we found a rule, apply it
 		if (ruleToApply !== null) {
 			console.log(`Applying rule '${ruleToApply.name}' at ${areaToApply!.cc.pos.name()}`);
-			ruleToApply.apply(this, areaToApply!);
+			ruleToApply.apply(this, areaToApply!, rotToApply);
 		}
 		// else console.log(`No rule to apply`);
 	}
 
 	//#endregion Rule Application
-}
-
-export class Item {
-	constructor(public type: TileType, public count: number) { }
-}
-
-class Grid {
-	public size: number = 10;
-	public tiles: Tile[];
-
-	private _emptyTile: Tile = new Tile(new P2(-1, -1), Tiles.Empty);
-
-	constructor() {
-		this.tiles = Array(this.size * this.size);
-		for (let y = 0; y < this.size; ++y) {
-			for (let x = 0; x < this.size; ++x) {
-				this.tiles[y * this.size + x] = new Tile(
-					new P2(x, y), Tiles.Empty);
-			}
-		}
-	}
-
-	public getTileOffset(pos: P2, x: number, y: number): Tile {
-		return this.getTile(pos.x + x, pos.y + y);
-	}
-
-	public getAdj4(pos: P2): Adj4 {
-		const uc = this.getTileOffset(pos, +0, +1);
-		const dc = this.getTileOffset(pos, +0, -1);
-		const cl = this.getTileOffset(pos, -1, +0);
-		const cr = this.getTileOffset(pos, +1, +0);
-		return { uc, dc, cl, cr };
-	}
-
-	public getAdj8(pos: P2): Adj8 {
-		const ul = this.getTileOffset(pos, -1, +1);
-		const uc = this.getTileOffset(pos, +0, +1);
-		const ur = this.getTileOffset(pos, +1, +1);
-		const cl = this.getTileOffset(pos, -1, +0);
-		const cr = this.getTileOffset(pos, +1, +0);
-		const dl = this.getTileOffset(pos, -1, -1);
-		const dc = this.getTileOffset(pos, +0, -1);
-		const dr = this.getTileOffset(pos, +1, -1);
-		return { ul, uc, ur, cl, cr, dl, dc, dr };
-	}
-
-	public getTile(pos: P2): Tile;
-	public getTile(x: number, y: number): Tile;
-	public getTile(xOrPos: number | P2, y?: number): Tile {
-		if (typeof xOrPos === 'object')
-			return this.getTileInternal(xOrPos.x, xOrPos.y);
-		return this.getTileInternal(xOrPos, y!);
-	}
-	private getTileInternal(x: number, y: number): Tile {
-		if (x < 0 || x >= this.size || y < 0 || y >= this.size)
-			return this._emptyTile;
-		return this.tiles[y * this.size + x]!;
-	}
-
-	public getTileType(pos: P2): TileType;
-	public getTileType(x: number, y: number): TileType;
-	public getTileType(xOrPos: number | P2, y?: number): TileType {
-		if (typeof xOrPos === 'object')
-			return this.getTileInternal(xOrPos.x, xOrPos.y).type;
-		return this.getTileInternal(xOrPos, y!).type;
-	}
-
-	public isTileEmpty(pos: P2) {
-		return this.getTileType(pos) === Tiles.Empty;
-	}
 }
 

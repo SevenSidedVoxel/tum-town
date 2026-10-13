@@ -9,7 +9,7 @@ import { GameState } from './GameState';
 
 import '../utils/domUtils';
 import '../utils/threeUtils';
-import { Tile, TileDraw } from './Tile';
+import { Tile, TileDraw, TileType } from './Tile';
 import { BatchedMesh } from 'three';
 import { Colors, Colors3 } from '../styles/colors';
 import { color3, float2, float3, float4, mat4x4, quat4 } from "../utils/threeUtils";
@@ -28,30 +28,34 @@ class RenderAssets {
 	public model_House2!: number;
 	public model_House3!: number;
 
-	public model_RoadSegment!: number;
-	public model_RoadJoin!: number;
-	public model_PathStone!: number;
-	public model_Intersection1!: number;
+	public model_LineSeg!: number;
+	public model_LineCap!: number;
+
+	public model_RoadStone!: number;
 
 	public model_Tree1!: number;
+	public model_SingleTrees!: number[];
 	public model_Tree2!: number;
 
 	loadModels(gltf: GLTF, batch: BatchedMesh) {
 		this.model_Missing = batch.addGeometry(new THREE.BoxGeometry(0.5, 0.5, 0.5));
+		this.model_LineSeg = addGeom(this, 'line_seg');
+		this.model_LineCap = addGeom(this, 'line_cap');
+
 		this.model_TileBG = addGeom(this, 'tile_bg');
 		this.model_Hover = addGeom(this, 'hover');
 		this.model_HoverActive = addGeom(this, 'hover_active');
 		this.model_House1 = addGeom(this, 'house.001');
-		this.model_House2 = addGeom(this, 'house.002');
-		this.model_House3 = addGeom(this, 'house.003');
-
-		this.model_Intersection1 = addGeom(this, 'road.001');
-		this.model_RoadSegment = addGeom(this, 'road_segment');
-		this.model_RoadJoin = addGeom(this, 'road_join');
-		this.model_PathStone = addGeom(this, 'road_stone');
-
-		this.model_Tree1 = addGeom(this, 'tree.001');
+		this.model_House2 = addGeom(this, 'house.005');
+		this.model_House3 = addGeom(this, 'house.006');
+		this.model_RoadStone = addGeom(this, 'road_stone');
+		this.model_SingleTrees = [
+			addGeom(this, 'tree.001'),
+			addGeom(this, 'tree.003'),
+		];
+		this.model_Tree1 = this.model_SingleTrees[0]!;
 		this.model_Tree2 = addGeom(this, 'tree.002');
+
 
 		function addGeom(self: RenderAssets, name: string) {
 			let geom = gltf.scene.getGeometryByName(name);
@@ -61,6 +65,11 @@ class RenderAssets {
 			}
 			return batch.addGeometry(geom);
 		}
+	}
+
+	public getModel(model: string | undefined): number {
+		if (!model) return this.model_Missing;
+		return this[model] ?? this.model_Missing;
 	}
 }
 
@@ -227,7 +236,8 @@ else
 	private game: GameState | undefined;
 
 	private gridSize: number = 0;
-	private hoverModel!: BatchedInstance;
+	private hoverSelectorModel!: BatchedInstance;
+	private hoverPreviewModel!: BatchedInstance;
 
 	public async setupForGame(game: GameState) {
 		this.game = game;
@@ -299,32 +309,56 @@ else
 
 		// Hover Model
 		{
-			this.hoverModel = this.addModel(
+			this.hoverSelectorModel = this.addModel(
 				this.assets.model_Hover,
 				new float3(0, 0, 0),
 				1,
 				Colors3.bad)
-				.setName('hover tile');
-			this.hoverModel.setVisible(false);
+				.setName('hover selector');
+			this.hoverSelectorModel.setVisible(false);
+
+			this.hoverPreviewModel = this.addModel(
+				this.assets.model_Hover,
+				new float3(0, 0, 0),
+				1,
+				Colors3.white)
+				.setName('hover preview');
+			this.hoverPreviewModel.setVisible(false);
 		}
 
 		this.scene.add(this.drawBatch);
 	}
 
-	public hoverTile(tile: Tile | null, canInteract: boolean) {
-		if (!this.hoverModel)
+	public hoverTile(tile: Tile | null,
+		canInteract: boolean,
+		potentialTile: TileType | null) {
+		if (!this.hoverSelectorModel)
 			return;
 
 		if (!tile?.draw) {
-			this.hoverModel.setVisible(false);
+			this.hoverSelectorModel.setVisible(false);
+			this.hoverPreviewModel?.setVisible(false);
 			return;
 		}
 
 		const pos = tile.pos;
-		this.hoverModel.setMesh(canInteract ? this.assets.model_HoverActive : this.assets.model_Hover);
-		this.hoverModel.setColor(canInteract ? Colors3.good : Colors3.bad);
-		this.hoverModel.setPosition(pos.x, pos.y, 0);
-		this.hoverModel.setVisible(true);
+		this.hoverSelectorModel.setMesh(canInteract ? this.assets.model_HoverActive : this.assets.model_Hover);
+		this.hoverSelectorModel.setColor(canInteract ? Colors3.good : Colors3.bad);
+		this.hoverSelectorModel.setPosition(pos.x, pos.y, 0);
+		this.hoverSelectorModel.setVisible(true);
+
+		if (canInteract
+			&& potentialTile?.model
+			&& this.hoverPreviewModel) {
+			this.hoverPreviewModel.setMesh(this.assets.getModel(potentialTile.model));
+			this.hoverPreviewModel.setColor(Colors3.tilePreview);
+			this.hoverPreviewModel.setPosition(pos.x, pos.y, 0);
+			this.hoverPreviewModel.setScale(0.5, 0.5, 0.5);
+			this.hoverPreviewModel.setVisible(true);
+		}
+		else {
+			this.hoverPreviewModel?.setVisible(false);
+		}
 	}
 
 	public draw(frame: Frame) {

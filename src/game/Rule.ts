@@ -1,5 +1,6 @@
 import { GameState } from "./GameState";
-import { Tile, Tiles, TileType } from "./Tile";
+import { Tile, TileType } from "./Tile";
+import { Tiles } from "./_tiles_";
 
 export function isTile(pattern: TileType, type: TileType): boolean {
 	return pattern === Tiles.Any || pattern === type;
@@ -78,12 +79,12 @@ export class Rule {
 	public name: string;
 	public match: Match3x3;
 	public matchFlags: MatchFlags;
-	public apply: (game: GameState, area: Area3x3) => void;
+	public apply: (game: GameState, area: Area3x3, rot: number) => void;
 
 	constructor(
 		name: string,
 		match: Partial<Match3x3>,
-		apply: (game: GameState, area: Area3x3) => void,
+		apply: (game: GameState, area: Area3x3, rot: number) => void,
 		matchFlags?: MatchFlags
 	) {
 		this.name = name;

@@ -1,5 +1,5 @@
 import { Colors } from "../styles/colors";
-import { color3, float3, Utils3 } from "../utils/threeUtils";
+import { color3, float3, quat4, Utils3 } from "../utils/threeUtils";
 import { Anims } from "./GameAnims";
 import { P2 } from "./P2";
 import { connectPathToAdj, isPath, Tile, buildPath_Stones, TileType, buildPath_Lines, rotatePathConnection } from "./Tile";
@@ -238,6 +238,34 @@ export const Tiles = {
 		}
 	},
 	Bridge: { name: "bridge", color: Colors.tileBridge },
+	Fountain: {
+		name: "fountain",
+		model: "model_Fountain",
+		color: Colors.tileRoad1,
+		centerOffset: 0,
+		animCreate(game, tile) {
+			if (!tile.draw) return;
+
+			const rng = tile.draw.rng;
+			rng.reset();
+			const centerPos = tile.draw.recalcCenterPos(tile.pos, this.centerOffset);
+
+			if (!tile.draw.firstTimeBuild())
+				return;
+
+			game.startCombinedAnim();
+			game.renderer.growMeshOnTile(
+				game.assets.getModel(this.model),
+				tile,
+				new color3(this.color),
+				Anims.BaseDur,
+				centerPos,
+				new float3().setScalar(1),
+				new quat4(),
+			);
+			game.endAndAddCombinedAnim();
+		},
+	},
 
 	Tree: {
 		name: "tree",

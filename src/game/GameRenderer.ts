@@ -12,7 +12,7 @@ import '../utils/threeUtils';
 import { Tile, TileDraw, TileType } from './Tile';
 import { BatchedMesh } from 'three';
 import { Colors, Colors3 } from '../styles/colors';
-import { color3, float2, float3, float4, mat4x4, quat4 } from "../utils/threeUtils";
+import { color3, float2, float3, float4, mat4x4, quat4, Utils3 } from "../utils/threeUtils";
 import { Anims, GameAnim } from './GameAnims';
 
 class RenderAssets {
@@ -32,6 +32,7 @@ class RenderAssets {
 	public model_LineCap!: number;
 
 	public model_RoadStone!: number;
+	public model_Fountain!: number;
 
 	public model_Tree1!: number;
 	public model_SingleTrees!: number[];
@@ -48,14 +49,16 @@ class RenderAssets {
 		this.model_House1 = addGeom(this, 'house.001');
 		this.model_House2 = addGeom(this, 'house.005');
 		this.model_House3 = addGeom(this, 'house.006');
+		
 		this.model_RoadStone = addGeom(this, 'road_stone');
+		this.model_Fountain = addGeom(this, 'fountain');
+
 		this.model_SingleTrees = [
 			addGeom(this, 'tree.001'),
 			addGeom(this, 'tree.003'),
 		];
 		this.model_Tree1 = this.model_SingleTrees[0]!;
 		this.model_Tree2 = addGeom(this, 'tree.002');
-
 
 		function addGeom(self: RenderAssets, name: string) {
 			let geom = gltf.scene.getGeometryByName(name);
@@ -144,6 +147,7 @@ export class GameRenderer {
 			// color: 0xFFFFFF, // tint
 			roughness: 0.8,
 			metalness: 0.01,
+			side: THREE.DoubleSide,
 		});
 		this.assets.matDefault.onBeforeCompile = (shader) => {
 			// Add varying: vInstanceColor
@@ -218,7 +222,7 @@ else
 		};
 
 		// Batched Mesh
-		const maxInstances = 1024;
+		const maxInstances = 2048;
 		const maxVertexCount = 10000;
 		const maxIndexCount = 20000;
 
@@ -231,7 +235,164 @@ else
 
 		// Models
 		this.assets.loadModels(gltf, this.drawBatch);
+
+		// Icon Rendering
+		await this.setupIconRendering();
 	}
+
+	//#region Icon Rendering
+
+	private icons = {
+		XOffset: 1000,
+		FullRenderSize: 1024,
+
+		canvas: null! as HTMLCanvasElement,
+		ctx: null as CanvasRenderingContext2D | null,
+
+		tmpCanvas: null! as HTMLCanvasElement,
+		tmpCtx: null as CanvasRenderingContext2D | null,
+
+		renderTarget: null! as THREE.WebGLRenderTarget,
+		scene: null! as THREE.Scene,
+		camera: null! as THREE.Camera,
+		iconModels: [] as BatchedInstance[],
+
+		pixelBuffer: null! as Uint8Array,
+		imageData: null! as ImageData,
+		imgDataURL: null! as string,
+		styleTag: null! as HTMLStyleElement,
+	};
+
+	private async setupIconRendering() {
+		const size = this.icons.FullRenderSize;
+
+		// Create the canvas
+		const canvas = this.icons.canvas = document.createElement('canvas');
+		canvas.width = size;
+		canvas.height = size;
+		this.icons.tmpCanvas = document.createElement('canvas');
+		this.icons.tmpCanvas.width = size;
+		this.icons.tmpCanvas.height = size;
+
+		// Create the context
+		const ctx = this.icons.ctx = canvas.getContext('2d', { alpha: true });
+		this.icons.tmpCtx = this.icons.tmpCanvas.getContext('2d', { alpha: true });
+		if (ctx == null) return;
+
+		// Create the style tag to hold the resulting image data URL
+		this.icons.styleTag = document.createElement('style');
+		document.head.appendChild(this.icons.styleTag);
+
+		// Preallocate an image from the context
+		// The render target will be copied to this image each frame
+		this.icons.pixelBuffer = new Uint8Array(1024 * 1024 * 4);
+		this.icons.imageData = ctx.createImageData(size, size);
+
+		// Create the render target
+		const renderTarget = this.icons.renderTarget = new THREE.WebGLRenderTarget(size, size, {
+			format: THREE.RGBAFormat,
+			type: THREE.UnsignedByteType,
+			minFilter: THREE.LinearFilter,
+			magFilter: THREE.LinearFilter,
+		});
+
+		// Camera
+		const camera = this.icons.camera = new THREE.PerspectiveCamera(10, 1 / 1, 0.1, 100);
+		const offsetX = this.icons.XOffset;
+		const centerX = offsetX + 3.5;
+		const centerY = 3.5;
+		camera.position.set(centerX, centerY, 47);
+		camera.lookAt(centerX, centerY, 0);
+
+		// Lighting
+		{
+			const iconSun = new THREE.PointLight(0xFFFFFF, 100, 100, 1);
+			iconSun.position.set(centerX, centerY - 10, 20);
+			iconSun.castShadow = false;
+			this.scene.add(iconSun);
+		}
+
+		// Add temp objects to test icon rendering
+		let nextIndex = 0;
+		addIconModel(this, this.assets.model_House1, Colors3.tileHouse1);
+		addIconModel(this, this.assets.model_House2, Colors3.tileHouse2);
+		addIconModel(this, this.assets.model_House3, Colors3.tileHouse3);
+		addIconModel(this, this.assets.model_Tree1, Colors3.tileTree1);
+		addIconModel(this, this.assets.model_Tree2, Colors3.tileTree2);
+		addIconModel(this, this.assets.model_RoadStone, Colors3.tileRoad1);
+		addIconModel(this, this.assets.model_Fountain, Colors3.tileRoad1);
+
+		function addIconModel(self: GameRenderer, modelID: number, color: color3) {
+			const index = nextIndex++;
+
+			let x = index % 8;
+			let y = Math.floor(index / 8);
+
+			self.icons.iconModels.push(
+				self.addModel(
+					modelID,
+					new float3(offsetX + x, y, 0),
+					0.5,
+					color)
+			);
+		}
+	}
+
+	private updateIcons(frame: Frame) {
+		const rot = Utils3.rotZRad(frame.time * 0.001);
+		for (const model of this.icons.iconModels) {
+			model.rotation.copy(rot);
+			model.updateMatrix();
+		}
+	}
+
+	private drawIcons(frame: Frame) {
+		const draw = this.renderer;
+		const icons = this.icons;
+		if (!icons.ctx) return;
+
+		this.updateIcons(frame);
+
+		// Render to the offscreen target
+		draw.setRenderTarget(icons.renderTarget);
+
+		// Clear
+		const prevBack = this.scene.background;
+		this.scene.background = null;
+		draw.setClearColor(0x000000, 0);
+		draw.clear(true, true, true);
+
+		// Render
+		icons.camera.updateMatrix();
+		draw.render(this.scene, icons.camera);
+
+		// Restore render
+		draw.setRenderTarget(null); // Reset back to main canvas/screen
+		this.scene.background = prevBack;
+
+		// Read the render target into a temp pixel buffer
+		const size = icons.FullRenderSize;
+		draw.readRenderTargetPixels(icons.renderTarget, 0, 0, size, size, icons.pixelBuffer);
+
+		// Draw the imageData to the temp canvas
+		icons.imageData.data.set(icons.pixelBuffer);
+		icons.tmpCtx!.putImageData(icons.imageData, 0, 0);
+
+		// Draw the temp canvas to the canvas (flipping the y-axis)
+		const ctx = icons.ctx;
+		ctx.clearRect(0, 0, size, size);
+		ctx.save();
+		ctx.scale(1, -1);
+		ctx.translate(0, -size);
+		ctx.drawImage(icons.tmpCanvas, 0, 0);
+		ctx.restore();
+
+		// Convert the canvas into a data URL
+		const dataUrl = icons.canvas.toDataURL('image/png');
+		this.icons.styleTag.textContent = `:root { --img-game-icons: url(${dataUrl}); }`;
+	}
+
+	//#endregion Icon Rendering
 
 	private game: GameState | undefined;
 
@@ -243,9 +404,6 @@ else
 		this.game = game;
 
 		this.gridSize = game.grid.size - 2;
-
-		// Background
-		this.scene.background = new color3('#151618');
 
 		// Camera
 		{
@@ -364,8 +522,15 @@ else
 	public draw(frame: Frame) {
 		if (!this.isReady) return;
 
-		// Trigger ThreeJS rendering
-		this.renderer.render(this.scene, this.camera);
+		const draw = this.renderer;
+
+		// Draw Game
+		draw.setRenderTarget(null);
+		draw.setClearColor(0x151618, 1);
+		draw.render(this.scene, this.camera);
+
+		// Draw Icons
+		this.drawIcons(frame);
 	}
 
 	public uiToWorld(uiPos: P2 | null): P2 | null {

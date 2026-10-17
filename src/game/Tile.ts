@@ -224,7 +224,7 @@ export function connectToTile(game: GameState, fromTile: Tile, toTile: Tile) {
 }
 
 export function isPath(type: TileType) {
-	return type == Tiles.Path;
+	return type == Tiles.Path || type == Tiles.Fountain;
 }
 
 export function buildPath_Lines(

@@ -1,5 +1,9 @@
 @import "./colors.css";
 
+:root {
+	--img-game-icons: none;
+}
+
 .game-ctr {
 	display: flex;
 	justify-content: center;
@@ -144,4 +148,13 @@
 	border-radius: 6px;
 
 	text-align: center;
+}
+
+.game-icons-preview {
+	width: 100%;
+	aspect-ratio: 1/1;
+	background-image: var(--img-game-icons);
+	background-size: contain;
+	background-repeat: no-repeat;
+	background-position: center;
 }

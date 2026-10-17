@@ -56,6 +56,7 @@ export class GameView implements IView {
 				<!--<button id="undoGameButton" class="button-icon icon-reset icon-20s"></button>-->
 			</div>
 			<button id="nextItemButton"></button>
+			<div class="game-icons-preview"></div>
 		</section>
 	</div>
 </div>

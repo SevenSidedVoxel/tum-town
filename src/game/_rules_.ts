@@ -81,5 +81,25 @@ export function makeRules(): Rule[] {
 		},
 		MatchFlags.None));
 
+	rules.push(new Rule("Make Fountain",
+		{
+			cc: Tiles.Empty,
+			uc: Tiles.Path,
+			dc: Tiles.Path,
+			cl: Tiles.Path,
+			cr: Tiles.Path,
+		},
+		(game, area, rot) => {
+			// Choose the newest tile to become the forest
+			const tiles = [area.cc, area.uc, area.ul, area.cl];
+			const lastTile = pickLastActIndex(tiles);
+
+			game.replaceTile(area.cc, Tiles.Fountain);
+
+			game.addScore(lastTile, 4);
+			game.addNat(lastTile, 1);
+		},
+		MatchFlags.None));
+
 	return rules;
 }

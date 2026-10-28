@@ -8,42 +8,61 @@ export function makeRules(): Rule[] {
 
 	rules.push(new Rule("Make Big-House",
 		{
-			cc: Tiles.House2,
-			uc: Tiles.House1,
-			dc: Tiles.House1,
-			cl: Tiles.House1,
-			cr: Tiles.House1,
+			c: Tiles.House2,
+			u: Tiles.House1,
+			d: Tiles.House1,
+			l: Tiles.House1,
+			r: Tiles.House1,
 		},
 		(ctx, area, rot) => {
 			ctx.mergeTilesInto(
-				area.cc,
-				[area.uc, area.dc, area.cl, area.cr],
+				area.c,
+				[area.u, area.d, area.l, area.r],
 				Tiles.House3,
-				area.cc.rot);
-			ctx.addScore(area.cc, 4);
-			ctx.addPop(area.cc, 4);
+				area.c.rot);
+			ctx.addScore(area.c, 4);
+			ctx.addPop(area.c, 4);
 		},
 		MatchFlags.None));
 	rules.push(new Rule("Make L-House",
 		{
-			cc: Tiles.House1,
-			uc: Tiles.House1,
-			cl: Tiles.House1,
-			dc: Tiles.House1,
+			c: Tiles.House1,
+			u: Tiles.House1,
+			l: Tiles.House1,
+			d: Tiles.House1,
 		},
 		(ctx, area, rot) => {
 			ctx.mergeTilesInto(
-				area.cc,
-				[area.uc, area.dc, area.cl],
+				area.c,
+				[area.u, area.d, area.l],
 				Tiles.House2,
 				rot);
-			ctx.addScore(area.cc, 3);
+			ctx.addScore(area.c, 3);
 		},
 		MatchFlags.Rotate4));
+	rules.push(new Rule("Make Square-House",
+		{
+			c: Tiles.House1,
+			u: Tiles.House1,
+			l: Tiles.House1,
+			ul: Tiles.House1,
+		},
+		(ctx, area, rot) => {
+			const tiles = [area.c, area.u, area.ul, area.l];
+			const lastTile = pickLastActIndex(tiles);
+
+			ctx.mergeTilesInto(
+				lastTile,
+				tiles.filter(t => t != lastTile),
+				Tiles.Factory1,
+				rot);
+			ctx.addScore(area.c, 3);
+		},
+		MatchFlags.None));
 
 	rules.push(new Rule("Make Forest X",
 		{
-			cc: Tiles.Tree,
+			c: Tiles.Tree,
 			ul: Tiles.Tree,
 			ur: Tiles.Tree,
 			dl: Tiles.Tree,
@@ -52,25 +71,25 @@ export function makeRules(): Rule[] {
 		(ctx, area, rot) => {
 			// Choose the newest tile to become the forest
 			ctx.mergeTilesInto(
-				area.cc,
+				area.c,
 				[area.ul, area.ur, area.dl, area.dr],
 				Tiles.Forest
 			);
 
-			ctx.addScore(area.cc, 4);
-			ctx.addNat(area.cc, 2);
+			ctx.addScore(area.c, 4);
+			ctx.addNat(area.c, 2);
 		},
 		MatchFlags.None));
 	rules.push(new Rule("Make Forest",
 		{
-			cc: Tiles.Tree,
-			uc: Tiles.Tree,
+			c: Tiles.Tree,
+			u: Tiles.Tree,
 			ul: Tiles.Tree,
-			cl: Tiles.Tree,
+			l: Tiles.Tree,
 		},
 		(ctx, area, rot) => {
 			// Choose the newest tile to become the forest
-			const tiles = [area.cc, area.uc, area.ul, area.cl];
+			const tiles = [area.c, area.u, area.ul, area.l];
 			const lastTile = pickLastActIndex(tiles);
 
 			ctx.mergeTilesInto(
@@ -84,20 +103,22 @@ export function makeRules(): Rule[] {
 		},
 		MatchFlags.None));
 
+	makeSawmillRules(rules);
+
 	rules.push(new Rule("Make Fountain",
 		{
-			cc: Tiles.Empty,
-			uc: Tiles.Path,
-			dc: Tiles.Path,
-			cl: Tiles.Path,
-			cr: Tiles.Path,
+			c: Tiles.Empty,
+			u: Tiles.Path,
+			d: Tiles.Path,
+			l: Tiles.Path,
+			r: Tiles.Path,
 		},
 		(ctx, area, rot) => {
 			// Choose the newest tile to become the forest
-			const tiles = [area.cc, area.uc, area.ul, area.cl];
+			const tiles = [area.c, area.u, area.ul, area.l];
 			const lastTile = pickLastActIndex(tiles);
 
-			ctx.replaceTile(area.cc, Tiles.Fountain);
+			ctx.replaceTile(area.c, Tiles.Fountain);
 
 			ctx.addScore(lastTile, 4);
 			ctx.addNat(lastTile, 1);
@@ -105,4 +126,18 @@ export function makeRules(): Rule[] {
 		MatchFlags.None));
 
 	return rules;
+}
+
+function makeSawmillRules(rules: Rule[]) {
+	rules.push(new Rule("Make Sawmill",
+		{
+			c: Tiles.Factory1,
+			u: Tiles.Forest,
+			l: Tiles.Forest,
+		},
+		(ctx, area, rot) => {
+			ctx.replaceTile(area.c, Tiles.Sawmill, rot);
+			ctx.addScore(area.c, 4);
+		},
+		MatchFlags.Rotate4));
 }

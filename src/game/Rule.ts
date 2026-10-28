@@ -1,4 +1,4 @@
-import { CTX, GameState } from "./GameState";
+import { CTX } from "./GameState";
 import { Tile, TileType } from "./Tile";
 import { Tiles } from "./_tiles_";
 
@@ -8,13 +8,13 @@ export function isTile(pattern: TileType, type: TileType): boolean {
 
 export class Match3x3 {
 	public ul: TileType = Tiles.Any;
-	public uc: TileType = Tiles.Any;
+	public u: TileType = Tiles.Any;
 	public ur: TileType = Tiles.Any;
-	public cl: TileType = Tiles.Any;
-	public cc: TileType = Tiles.Empty;
-	public cr: TileType = Tiles.Any;
+	public l: TileType = Tiles.Any;
+	public c: TileType = Tiles.Empty;
+	public r: TileType = Tiles.Any;
 	public dl: TileType = Tiles.Any;
-	public dc: TileType = Tiles.Any;
+	public d: TileType = Tiles.Any;
 	public dr: TileType = Tiles.Any;
 
 	constructor(init?: Partial<Match3x3>) {
@@ -23,10 +23,10 @@ export class Match3x3 {
 
 	public isMatch(area: Area3x3): boolean {
 		// The center should be checked already
-		return isTile(this.uc, area.uc.type)
-			&& isTile(this.cr, area.cr.type)
-			&& isTile(this.dc, area.dc.type)
-			&& isTile(this.cl, area.cl.type)
+		return isTile(this.u, area.u.type)
+			&& isTile(this.r, area.r.type)
+			&& isTile(this.d, area.d.type)
+			&& isTile(this.l, area.l.type)
 			&& isTile(this.ul, area.ul.type)
 			&& isTile(this.ur, area.ur.type)
 			&& isTile(this.dr, area.dr.type)
@@ -38,9 +38,9 @@ type TileArray3x3 = [Tile, Tile, Tile, Tile, Tile, Tile, Tile, Tile, Tile];
 
 export class Area3x3 {
 	constructor(
-		public ul: Tile, public uc: Tile, public ur: Tile,
-		public cl: Tile, public cc: Tile, public cr: Tile,
-		public dl: Tile, public dc: Tile, public dr: Tile
+		public ul: Tile, public u: Tile, public ur: Tile,
+		public l: Tile, public c: Tile, public r: Tile,
+		public dl: Tile, public d: Tile, public dr: Tile
 	) { }
 
 	public static create(tiles: TileArray3x3) {
@@ -59,9 +59,9 @@ export class Adj4<T> {
 
 export class Adj8<T> {
 	constructor(
-		public ul: T, public uc: T, public ur: T,
-		public cl: T, public cr: T,
-		public dl: T, public dc: T, public dr: T
+		public ul: T, public u: T, public ur: T,
+		public l: T, public r: T,
+		public dl: T, public d: T, public dr: T
 	) { }
 }
 

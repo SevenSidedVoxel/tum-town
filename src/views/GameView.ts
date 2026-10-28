@@ -7,7 +7,7 @@ import { GameRenderer } from "../game/render/GameRenderer";
 import { Tile, TileType } from "../game/Tile";
 
 export const BuildTimestamp = __BUILD_TIMESTAMP__;
-export const BuildID = "bezier";
+export const BuildID = "blazing";
 
 export class GameView implements IView {
 	private ctx: AppCtx;

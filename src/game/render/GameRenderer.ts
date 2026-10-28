@@ -30,6 +30,9 @@ class RenderAssets {
 	public model_House2!: number;
 	public model_House3!: number;
 
+	public model_Factory1!: number;
+	public model_Sawmill!: number;
+
 	public model_LineSeg!: number;
 	public model_LineCap!: number;
 
@@ -49,8 +52,10 @@ class RenderAssets {
 		this.model_Hover = addGeom(this, 'hover');
 		this.model_HoverActive = addGeom(this, 'hover_active');
 		this.model_House1 = addGeom(this, 'house.001');
-		this.model_House2 = addGeom(this, 'house.005');
-		this.model_House3 = addGeom(this, 'house.006');
+		this.model_House2 = addGeom(this, 'house.002');
+		this.model_House3 = addGeom(this, 'house.003');
+		this.model_Factory1 = addGeom(this, 'building.002');
+		this.model_Sawmill = addGeom(this, 'sawmill');
 
 		this.model_RoadStone = addGeom(this, 'road_stone');
 		this.model_Fountain = addGeom(this, 'fountain');
@@ -139,6 +144,12 @@ export class GameRenderer {
 		const glbFetch = await fetch(glbModelsUrl);
 		const glbBuffer = await glbFetch.arrayBuffer();
 		const gltf = await loader.parseAsync(glbBuffer, '');
+		gltf.scene.traverse(child => {
+			if (child instanceof THREE.Mesh) {
+				child.geometry.scale(0.25, 0.25, 0.25);
+				child.geometry.rotateX(degToRad(90));
+			}
+		})
 
 		// Color Palette
 		this.assets.texPalette = await gltf.parser.getDependency('texture', 0);

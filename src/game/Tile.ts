@@ -7,6 +7,7 @@ import { RandomSlice } from "./SeededRandom";
 import { GameState, CTX as CTX } from "./GameState";
 import { Tiles } from "./_tiles_";
 import { ModelCollection } from "./ModelCollection";
+import { Pathing } from "./PathSystem";
 
 export class Tile {
 	// State
@@ -25,6 +26,8 @@ export class Tile {
 	public models: ModelCollection = new ModelCollection();
 	private rngSeed: number;
 	private drawCache: TileDrawCache = new TileDrawCache();
+
+	public get name() { return this.pos.name(); }
 
 	constructor(pos: P2, type: TileType) {
 		this.pos = pos;
@@ -54,6 +57,7 @@ export class Tile {
 
 		ctx.startCombinedAnim();
 		this.type.regen(ctx, this);
+		ctx.paths.updatePaths(ctx, this);
 		return ctx.endCombinedAnim();
 	}
 
@@ -147,6 +151,9 @@ export type TileType = {
 
 	// Interact
 	interact?: (ctx: CTX, tile: Tile) => void;
+
+	// Pathing
+	pathing?: Pathing;
 
 	// Visuals
 	color?: color3;

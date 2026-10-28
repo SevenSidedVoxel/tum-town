@@ -2,7 +2,7 @@ import { Colors3 } from "../styles/colors";
 import { color3, float3, quat4, Utils3 } from "../utils/threeUtils";
 import { Anims } from "./GameAnims";
 import { P2 } from "./P2";
-import { PathSystem } from "./PathSystem";
+import { Pathing } from "./PathSystem";
 import { Tile, TileType } from "./Tile";
 
 export const Tiles = {
@@ -24,19 +24,20 @@ export const Tiles = {
 		},
 		color: Colors3.tileHouse1,
 		centerVariance: 0.025,
+		pathing: Pathing.ConnectAny_Adj4(),
 		place(ctx, tile) {
 			ctx.addScore(tile, 1);
 			ctx.replaceTile(tile, this);
 		},
 		interact(ctx, tile) {
-			ctx.paths.rotatePath(ctx, tile);
+			ctx.paths.rotatePath_Adj4(ctx, tile);
 		},
 		regen(ctx, tile) {
 			if (tile.firstTimeBuild()) {
 				// Add model
 				const rng = tile.rng(ctx);
 				const centerPos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
-				const size = rng.nextF(0.7, 0.8);
+				const size = rng.nextF(0.5, 0.6);
 				const zDeg = rng.nextDegSnapped(30);
 
 				ctx.growMeshOnTile(
@@ -49,79 +50,20 @@ export const Tiles = {
 					Utils3.rotZDeg(zDeg),
 				);
 			}
-
-			// Connect to an adjacent path
-			ctx.paths.connectToAny_Adj4(ctx, tile);
 		},
 	},
-	House2: {
-		name: "house2",
-		model: "model_House2",
-		color: Colors3.tileHouse2,
-		centerVariance: 0.005,
-		interact(ctx, tile) {
-			ctx.paths.rotatePath(ctx, tile);
-		},
-		regen(ctx, tile) {
-			if (tile.firstTimeBuild()) {
-				// Add model
-				const rng = tile.rng(ctx);
-				const pos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance)
-					.add({ x: 0, y: -0.1, z: 0 });
-				const size = rng.nextF(0.7, 0.8);
-				const zDeg = tile.rot ?? 0;
+	House2: makeSimpleBuilding("house2", "model_House2", { scale: 0.8, color: Colors3.tileHouse2 }),
+	House3: makeSimpleBuilding("house3", "model_House3", { scale: 0.8, color: Colors3.tileHouse3 }),
 
-				ctx.growMeshOnTile(
-					tile.models,
-					tile,
-					ctx.assets.getModel(this.model),
-					new color3(this.color),
-					pos,
-					new float3(size, size, size),
-					Utils3.rotZDeg(zDeg),
-				);
-			}
-
-			// Connect to an adjacent path
-			ctx.paths.connectToAny_Adj4(ctx, tile);
-		}
-	},
-	House3: {
-		name: "house3",
-		model: "model_House3",
-		color: Colors3.tileHouse3,
-		interact(ctx, tile) {
-			ctx.paths.rotatePath(ctx, tile);
-		},
-		regen(ctx, tile) {
-			if (tile.firstTimeBuild()) {
-				// Add model
-				const rng = tile.rng(ctx);
-				const pos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
-				const size = rng.nextF(0.7, 0.8);
-				const zDeg = tile.rot ?? 0;
-
-				ctx.growMeshOnTile(
-					tile.models,
-					tile,
-					ctx.assets.getModel(this.model),
-					new color3(this.color),
-					pos,
-					new float3(size, size, size),
-					Utils3.rotZDeg(zDeg),
-				);
-			}
-
-			// Connect to an adjacent path
-			ctx.paths.connectToAny_Adj4(ctx, tile);
-		}
-	},
+	Factory1: makeSimpleBuilding("building", "model_Factory1", { scale: 0.8, color: Colors3.tileHouse2 }),
+	Sawmill: makeSimpleBuilding("sawmill", "model_Sawmill", { scale: 0.8, rot: -10, color: Colors3.tileHouse2 }),
 
 	Path: {
 		name: "path",
 		model: "model_LineCap",
 		color: Colors3.tileRoad1,
 		centerVariance: 0,
+		pathing: Pathing.ConnectAll_Adj8(),
 		place(ctx, tile) {
 			ctx.addScore(tile, 1);
 			ctx.replaceTile(tile, this);
@@ -144,32 +86,6 @@ export const Tiles = {
 					Utils3.rotZDeg(zDeg),
 				);
 			}
-
-			{
-				// Connect to adjacent paths in the Up/Left/Right directions
-				const adj = ctx.grid.getAdj8(tile.pos);
-				const connectU = PathSystem.isPath(adj.uc);
-				const connectL = PathSystem.isPath(adj.cl);
-				const connectR = PathSystem.isPath(adj.cr);
-				const connectD = PathSystem.isPath(adj.dc);
-
-				updatePath(tile, adj.uc, connectU, false);
-				updatePath(tile, adj.dc, connectD, false);
-				updatePath(tile, adj.cl, connectL, false);
-				updatePath(tile, adj.cr, connectR, false);
-				updatePath(tile, adj.ul, !connectU && !connectL && PathSystem.isPath(adj.ul), true);
-				updatePath(tile, adj.ur, !connectU && !connectR && PathSystem.isPath(adj.ur), true);
-				updatePath(tile, adj.dl, !connectD && !connectL && PathSystem.isPath(adj.dl), true);
-				updatePath(tile, adj.dr, !connectD && !connectR && PathSystem.isPath(adj.dr), true);
-				return;
-
-				function updatePath(tile: Tile, otherTile: Tile, shouldConnect: boolean, forceRemove: boolean) {
-					if (shouldConnect)
-						ctx.paths.connectTiles(ctx, tile.pos, otherTile.pos);
-					else if (otherTile.type == Tiles.Empty || forceRemove)
-						ctx.paths.disconnectTiles(ctx, tile.pos, otherTile.pos);
-				}
-			}
 		}
 	},
 	Fountain: {
@@ -177,6 +93,8 @@ export const Tiles = {
 		model: "model_Fountain",
 		color: Colors3.tileRoad1,
 		centerVariance: 0,
+		pathing: Pathing.ConnectAll_Adj4()
+			.preventDiagonals(),
 		regen(ctx, tile) {
 			if (tile.firstTimeBuild()) {
 				const rng = tile.rng(ctx);
@@ -190,9 +108,6 @@ export const Tiles = {
 					pos,
 				);
 			}
-
-			// Connect to all adjacent paths
-			ctx.paths.connectToAll_Adj4(ctx, tile);
 		},
 	},
 
@@ -229,12 +144,12 @@ export const Tiles = {
 				count++;
 			}
 			addTileWeight(adj.ul, -1, +1);
-			addTileWeight(adj.uc, +0, +1);
+			addTileWeight(adj.u, +0, +1);
 			addTileWeight(adj.ur, +1, +1);
-			addTileWeight(adj.cl, -1, +0);
-			addTileWeight(adj.cr, +1, +0);
+			addTileWeight(adj.l, -1, +0);
+			addTileWeight(adj.r, +1, +0);
 			addTileWeight(adj.dl, -1, -1);
-			addTileWeight(adj.dc, +0, -1);
+			addTileWeight(adj.d, +0, -1);
 			addTileWeight(adj.dr, +1, -1);
 			if (count != 0) {
 				center.mulS(1.0 / count);
@@ -304,3 +219,44 @@ export const Tiles = {
 
 	Water: { name: "water", color: Colors3.tileWater },
 } as const satisfies Record<string, TileType>;
+
+function makeSimpleBuilding(
+	name: string,
+	modelName: string,
+	draw: {
+		scale?: number,
+		rot?: number,
+		color?: color3
+	} = { }) {
+	const baseModelScale = draw?.scale ?? 1;
+	const baseModelRot = draw?.rot ?? 0;
+	const color = draw?.color ?? Colors3.tileHouse1;
+	return {
+		name: name,
+		model: modelName,
+		color: color,
+		centerVariance: 0,
+		pathing: Pathing.ConnectAny_Adj4(),
+		interact(ctx, tile) {
+			ctx.paths.rotatePath_Adj4(ctx, tile);
+		},
+		regen(ctx, tile) {
+			if (tile.firstTimeBuild()) {
+				// Add model
+				const centerPos = Tile.calcVisualCenterPos(tile.pos);
+				const size = baseModelScale;
+				const zDeg = baseModelRot + (tile.rot ?? 0);
+
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					ctx.assets.getModel(this.model),
+					new color3(this.color),
+					centerPos,
+					new float3(size, size, size),
+					Utils3.rotZDeg(zDeg),
+				);
+			}
+		},
+	};
+}

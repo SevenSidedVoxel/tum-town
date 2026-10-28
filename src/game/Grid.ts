@@ -51,7 +51,7 @@ export class Grid<T> {
 		const dl = this.getOffset(pos, -1, -1);
 		const dc = this.getOffset(pos, +0, -1);
 		const dr = this.getOffset(pos, +1, -1);
-		return { ul, uc, ur, cl, cr, dl, dc, dr };
+		return { ul, u: uc, ur, l: cl, r: cr, dl, d: dc, dr };
 	}
 
 	public get(pos: P2): T;

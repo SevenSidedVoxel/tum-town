@@ -15,6 +15,8 @@ import { color3, float3, quat4 } from "../utils/threeUtils";
 import { BatchedInstance } from "./render/BatchedInstance";
 import { Colors3 } from "../styles/colors";
 
+const shouldLogTileDataUpdates = false;
+
 export class CTX {
 	public game: GameState;
 
@@ -89,8 +91,6 @@ export class CTX {
 			anim = Anims.combined(this._currAnimList);
 		else
 			anim = undefined;
-		if (anim)
-			console.log("end combined anim", this._currAnimList.length, anim);
 
 		const prevList = this._prevAnimLists.pop()!;
 		this._currAnimList = prevList;
@@ -261,7 +261,7 @@ export class GameState {
 		this.grid = new Grid(10,
 			new Tile(new P2(-1, -1), Tiles.Empty),
 			pos => new Tile(pos, Tiles.Empty));
-		this.paths = new PathSystem();
+		this.paths = new PathSystem(this);
 	}
 
 	public setupGame() {
@@ -367,7 +367,8 @@ export class GameState {
 		if (tile.type === type)
 			return;
 
-		console.log(`Setting ${tile.pos.name()} to '${type.name}'`);
+		if (shouldLogTileDataUpdates)
+			console.log(`Setting ${tile.name} to '${type.name}'`);
 		tile.type = type;
 		tile.rot = rot;
 		tile.shouldRegen = true;
@@ -456,11 +457,11 @@ export class GameState {
 			return; // Out of bounds or on edge
 
 		const tile = this.grid.get(x, y);
+		tile.shouldRegen = true;
 		if (!tile.shouldCheck) {
-			// console.log(`To Check ${tile.pos.name()}`);
+			// console.log(`To Check ${tile.name}`);
 
 			tile.shouldCheck = true;
-			tile.shouldRegen = true;
 			this.tilesToCheck++;
 		}
 	}
@@ -478,7 +479,7 @@ export class GameState {
 	private markTileChecked(tile: Tile) {
 		if (!tile.shouldCheck) return;
 
-		// console.log(`Checked ${tile.pos.name()}`);
+		// console.log(`Checked ${tile.name}`);
 
 		tile.shouldCheck = false;
 		this.tilesToCheck--;
@@ -494,6 +495,8 @@ export class GameState {
 	public applyRulesOnce(ctx: CTX) {
 		if (!this.hasUnappliedRules)
 			return;
+
+		// TODO: Consider optimizing by caching the applicable rules against the tile type
 
 		let ruleIndex = Number.MAX_SAFE_INTEGER;
 		let ruleToApply: Rule | null = null;
@@ -528,7 +531,7 @@ export class GameState {
 					break; // A matched rule is better
 				}
 
-				if (!isTile(rule.match.cc, cc.type))
+				if (!isTile(rule.match.c, cc.type))
 					continue; // Center does not match
 
 				// Try matching the rule
@@ -581,12 +584,22 @@ export class GameState {
 
 		// If we found a rule, apply it
 		if (ruleToApply !== null) {
-			console.log(`Applying rule '${ruleToApply.name}' at ${areaToApply!.cc.pos.name()}`);
+			console.log(`Applying rule '${ruleToApply.name}' at ${areaToApply!.c.pos.name()}`);
 			ruleToApply.apply(ctx, areaToApply!, rotToApply);
 		}
 		// else console.log(`No rule to apply`);
 	}
 
 	//#endregion Rule Application
+
+	public getRegenListStr() {
+		let str = '';
+
+		for (const tile of this.grid.cells) {
+			if (tile.shouldRegen) str += `${tile.name},`;
+		}
+
+		return str;
+	}
 }
 

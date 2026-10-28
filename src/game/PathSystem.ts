@@ -40,21 +40,85 @@ class Path {
 	}
 }
 
+enum PathRules {
+	None,
+
+	ConnectAll_Adj4,
+	ConnectAll_Adj8,
+
+	ConnectAny_Adj4,
+	ConnectAny_Adj8,
+}
+
+enum PathRestrictions {
+	None,
+	PreventDiagonals = 0x1,
+}
+
+export class Pathing {
+	public static Default = new Pathing(PathRules.None);
+	public static None() { return new Pathing(PathRules.None); };
+	public static ConnectAll_Adj4() { return new Pathing(PathRules.ConnectAll_Adj4); };
+	public static ConnectAny_Adj4() { return new Pathing(PathRules.ConnectAny_Adj4); };
+	public static ConnectAll_Adj8() { return new Pathing(PathRules.ConnectAll_Adj8); };
+	public static ConnectAny_Adj8() { return new Pathing(PathRules.ConnectAny_Adj8); };
+
+	public connections: PathRules;
+	public restrictions: PathRestrictions = PathRestrictions.None;
+
+	constructor(connRules: PathRules) {
+		this.connections = connRules;
+	}
+
+	public get preventsDiagonals(): boolean { return (this.restrictions & PathRestrictions.PreventDiagonals) != 0; }
+	public preventDiagonals(): Pathing {
+		this.restrictions |= PathRestrictions.PreventDiagonals;
+		return this;
+	}
+}
+
+const shouldLog = false;
 export class PathSystem {
+
+	private game: GameState;
 	private grid: Grid<Path[]>;
 	private pathsToRebuild: Path[] = [];
 
-	constructor() {
+	constructor(game: GameState) {
+		this.game = game;
 		this.grid = new Grid<Path[]>(10, null, pos => []);
 	}
 
-	public reset(game: GameState) {
+	public reset() {
 		this.grid.cells.forEach(paths => {
 			paths.forEach(p => {
-				game.addAnim(p.models.destroyAll_anim());
+				this.game.addAnim(p.models.destroyAll_anim());
 			});
 			paths.length = 0;
 		});
+	}
+
+	public updatePaths(ctx: CTX, tile: Tile) {
+		const pathing = tile.type.pathing ?? Pathing.Default;
+
+		// Apply connection rule
+		switch (pathing.connections) {
+			case PathRules.None:
+				break;
+			case PathRules.ConnectAny_Adj4:
+				this.connectToAny_Adj4(ctx, tile, PathSystem.isPath);
+				break;
+			case PathRules.ConnectAll_Adj4:
+				this.connectToAll_Adj4(ctx, tile, PathSystem.isPath);
+				break;
+
+			case PathRules.ConnectAny_Adj8:
+				this.connectToAny_Adj8(ctx, tile, PathSystem.isPath);
+				break;
+			case PathRules.ConnectAll_Adj8:
+				this.connectToAll_Adj8(ctx, tile, PathSystem.isPath);
+				break;
+		}
 	}
 
 	public getPaths(pos: P2) {
@@ -81,7 +145,8 @@ export class PathSystem {
 		const path = new Path(from, to);
 		fromPaths?.push(path);
 		toPaths?.push(path);
-		console.log(`Add path from ${from.name()} to ${to.name()}`);
+		if (shouldLog)
+			console.log(`Add path from ${from.name()} to ${to.name()}`);
 		return path;
 	}
 	private removePath(from: P2, to: P2): Path | null {
@@ -105,7 +170,7 @@ export class PathSystem {
 			}
 		}
 
-		if (path != null)
+		if (shouldLog && path != null)
 			console.log(`Remove path from ${from.name()} to ${to.name()}`);
 		return path ?? null;
 	}
@@ -155,12 +220,12 @@ export class PathSystem {
 	public connectToAll_Adj4(
 		ctx: CTX,
 		tile: Tile,
-		canConnect: (tile: Tile) => boolean = PathSystem.isPathLike
+		canConnect: (tile: Tile) => boolean = PathSystem.isPath
 	) {
-		tryConnect(+0, -1); // down
-		tryConnect(+1, +0); // right
-		tryConnect(-1, +0); // left
 		tryConnect(+0, +1); // up
+		tryConnect(+0, -1); // down
+		tryConnect(-1, +0); // left
+		tryConnect(+1, +0); // right
 
 		function tryConnect(xOffset, yOffset) {
 			const otherTile = ctx.grid.getOffset(tile.pos, xOffset, yOffset);
@@ -176,13 +241,14 @@ export class PathSystem {
 	public connectToAny_Adj4(
 		ctx: CTX,
 		tile: Tile,
-		canConnect: (tile: Tile) => boolean = PathSystem.isPathLike
+		canConnect: (tile: Tile) => boolean = PathSystem.isPath
 	) {
 		const paths = this.getPaths(tile.pos);
 		if (paths?.length > 0)
 			return; // already connected
 
 		// Check other tiles for potential connections
+		// Ordered to maximize visibility of the path
 		if (tryConnect(+0, -1)) return; // down
 		if (tryConnect(+1, +0)) return; // right
 		if (tryConnect(-1, +0)) return; // left
@@ -199,10 +265,108 @@ export class PathSystem {
 		}
 	}
 
-	public rotatePath(
+	public connectToAll_Adj8(
 		ctx: CTX,
 		tile: Tile,
-		canConnect: (tile: Tile) => boolean = PathSystem.isPathLike
+		canConnect: (tile: Tile) => boolean = PathSystem.isPath
+	) {
+		// Connect to adjacent paths in the Up/Left/Right directions
+		const adj = ctx.grid.getAdj8(tile.pos);
+		const connectU = canConnect(adj.u);
+		const connectL = canConnect(adj.l);
+		const connectR = canConnect(adj.r);
+		const connectD = canConnect(adj.d);
+		const connectUL = !connectU && !connectL
+			&& !adj.u.type.pathing?.preventsDiagonals
+			&& !adj.l.type.pathing?.preventsDiagonals
+			&& canConnect(adj.ul);
+		const connectUR = !connectU && !connectR
+			&& !adj.u.type.pathing?.preventsDiagonals
+			&& !adj.r.type.pathing?.preventsDiagonals
+			&& canConnect(adj.ur);
+		const connectDL = !connectD && !connectL
+			&& !adj.d.type.pathing?.preventsDiagonals
+			&& !adj.l.type.pathing?.preventsDiagonals
+			&& canConnect(adj.dl);
+		const connectDR = !connectD && !connectR
+			&& !adj.d.type.pathing?.preventsDiagonals
+			&& !adj.r.type.pathing?.preventsDiagonals
+			&& canConnect(adj.dr);
+
+		updatePath(tile, adj.u, connectU, false);
+		updatePath(tile, adj.d, connectD, false);
+		updatePath(tile, adj.l, connectL, false);
+		updatePath(tile, adj.r, connectR, false);
+		updatePath(tile, adj.ul, connectUL, true);
+		updatePath(tile, adj.ur, connectUR, true);
+		updatePath(tile, adj.dl, connectDL, true);
+		updatePath(tile, adj.dr, connectDR, true);
+
+		function updatePath(tile: Tile, otherTile: Tile, shouldConnect: boolean, forceRemove: boolean) {
+			if (shouldConnect)
+				ctx.paths.connectTiles(ctx, tile.pos, otherTile.pos);
+			else if (otherTile.type == Tiles.Empty || forceRemove)
+				ctx.paths.disconnectTiles(ctx, tile.pos, otherTile.pos);
+		}
+	}
+
+	public connectToAny_Adj8(
+		ctx: CTX,
+		tile: Tile,
+		canConnect: (tile: Tile) => boolean = PathSystem.isPath,
+	) {
+		const paths = this.getPaths(tile.pos);
+		if (paths?.length > 0)
+			return; // already connected
+
+		// Connect to adjacent paths in the Up/Left/Right directions
+		const adj = ctx.grid.getAdj8(tile.pos);
+		const connectU = canConnect(adj.u);
+		const connectL = canConnect(adj.l);
+		const connectR = canConnect(adj.r);
+		const connectD = canConnect(adj.d);
+		const connectUL = !connectU && !connectL
+			&& !adj.u.type.pathing?.preventsDiagonals
+			&& !adj.l.type.pathing?.preventsDiagonals
+			&& canConnect(adj.ul);
+		const connectUR = !connectU && !connectR
+			&& !adj.u.type.pathing?.preventsDiagonals
+			&& !adj.r.type.pathing?.preventsDiagonals
+			&& canConnect(adj.ur);
+		const connectDL = !connectD && !connectL
+			&& !adj.d.type.pathing?.preventsDiagonals
+			&& !adj.l.type.pathing?.preventsDiagonals
+			&& canConnect(adj.dl);
+		const connectDR = !connectD && !connectR
+			&& !adj.d.type.pathing?.preventsDiagonals
+			&& !adj.r.type.pathing?.preventsDiagonals
+			&& canConnect(adj.dr);
+
+		// Check other tiles for potential connections
+		// Ordered to maximize visibility of the path
+		if (tryConnect(adj.d, connectD)) return;
+		if (tryConnect(adj.r, connectR)) return;
+		if (tryConnect(adj.l, connectL)) return;
+		if (tryConnect(adj.u, connectU)) return;
+		if (tryConnect(adj.dr, connectDR)) return;
+		if (tryConnect(adj.dl, connectDL)) return;
+		if (tryConnect(adj.ul, connectUL)) return;
+		if (tryConnect(adj.ur, connectUR)) return;
+
+		function tryConnect(otherTile, shouldConnect) {
+			if (shouldConnect) {
+				ctx.paths.connectTiles(ctx, tile.pos, otherTile.pos);
+				return true;
+			}
+
+			return false;
+		}
+	}
+
+	public rotatePath_Adj4(
+		ctx: CTX,
+		tile: Tile,
+		canConnect: (tile: Tile) => boolean = PathSystem.isPath
 	) {
 		const paths = this.getPaths(tile.pos);
 		if (paths?.length != 1)
@@ -435,10 +599,5 @@ export class PathSystem {
 
 	public static isPath(tile: Tile) {
 		return tile.type == Tiles.Path;
-	}
-
-	public static isPathLike(tile: Tile) {
-		return tile.type == Tiles.Path
-			|| tile.type == Tiles.Fountain;
 	}
 }

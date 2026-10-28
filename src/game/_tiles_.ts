@@ -1,289 +1,218 @@
-import { Colors } from "../styles/colors";
+import { Colors3 } from "../styles/colors";
 import { color3, float3, quat4, Utils3 } from "../utils/threeUtils";
 import { Anims } from "./GameAnims";
 import { P2 } from "./P2";
-import { connectPathToAdj, isPath, Tile, buildPath_Stones, TileType, buildPath_Lines, rotatePathConnection } from "./Tile";
+import { PathSystem } from "./PathSystem";
+import { Tile, TileType } from "./Tile";
 
 export const Tiles = {
 	Any: { name: "any" },
 	Empty: {
 		name: "empty",
-		animCreate(game, tile) {
-			if (!tile.draw) return;
-			game.addAnim(tile.draw.destroyAllModels(Anims.BaseDur));
+		canPlace(game, tile) { return true; },
+		regen(ctx, tile) {
+			ctx.addAnim(tile.destroyModels_anim(ctx));
 		}
 	},
 
 	House1: {
 		name: "house",
 		model: "model_House1",
-		color: Colors.tileHouse1,
-		centerOffset: 0.025,
-		place(game, tile) {
-			game.addScore(tile, 1);
-			game.replaceTile(tile, this);
+		icon: {
+			baseSize: 0.7,
+			baseDegZ: 5,
 		},
-		interact(game, tile) {
-			rotatePathConnection(game, tile);
+		color: Colors3.tileHouse1,
+		centerVariance: 0.025,
+		place(ctx, tile) {
+			ctx.addScore(tile, 1);
+			ctx.replaceTile(tile, this);
 		},
-		animCreate(game, tile) {
-			if (!tile.draw) return;
-			game.startCombinedAnim();
-
-			const rng = tile.draw.rng;
-			rng.reset();
-			const offset = this.centerOffset ?? 0;
-			tile.draw.centerPos.set(
-				tile.pos.x + rng.nextF(-offset, offset),
-				tile.pos.y + rng.nextF(-offset, offset),
-				0
-			);
-			const centerPos = tile.draw.centerPos;
-
-			// Calculate house model vars
-			const houseSize = rng.nextF(0.7, 0.8);
-			const zDeg = rng.nextDegSnapped(30);
-
-			// Connect to adjacent path
-			connectPathToAdj(game, tile);
-
-			if (tile.draw.firstTimeBuild()) {
+		interact(ctx, tile) {
+			ctx.paths.rotatePath(ctx, tile);
+		},
+		regen(ctx, tile) {
+			if (tile.firstTimeBuild()) {
 				// Add model
-				game.renderer.growMeshOnTile(
-					game.assets.getModel(this.model),
+				const rng = tile.rng(ctx);
+				const centerPos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
+				const size = rng.nextF(0.7, 0.8);
+				const zDeg = rng.nextDegSnapped(30);
+
+				ctx.growMeshOnTile(
+					tile.models,
 					tile,
+					ctx.assets.getModel(this.model),
 					new color3(this.color),
-					Anims.BaseDur,
 					centerPos,
-					new float3(houseSize, houseSize, houseSize),
-					Utils3.rotZDeg(zDeg)
+					new float3(size, size, size),
+					Utils3.rotZDeg(zDeg),
 				);
 			}
 
-			game.endAndAddCombinedAnim();
+			// Connect to an adjacent path
+			ctx.paths.connectToAny_Adj4(ctx, tile);
 		},
 	},
 	House2: {
 		name: "house2",
 		model: "model_House2",
-		color: Colors.tileHouse2,
-		centerOffset: 0.005,
-		interact(game, tile) {
-			rotatePathConnection(game, tile);
+		color: Colors3.tileHouse2,
+		centerVariance: 0.005,
+		interact(ctx, tile) {
+			ctx.paths.rotatePath(ctx, tile);
 		},
-		animCreate(game, tile) {
-			if (!tile.draw) return;
-			game.startCombinedAnim();
-
-			const rng = tile.draw.rng;
-			rng.reset();
-			const offset = this.centerOffset ?? 0;
-			tile.draw.centerPos.set(
-				tile.pos.x + rng.nextF(-offset, offset),
-				tile.pos.y - 0.1 + rng.nextF(-offset, offset),
-				0
-			);
-			const centerPos = tile.draw.centerPos;
-
-			// Calculate house model vars
-			const size = rng.nextF(0.7, 0.8);
-
-			// Connect to adjacent path
-			connectPathToAdj(game, tile);
-
-			if (tile.draw.firstTimeBuild()) {
+		regen(ctx, tile) {
+			if (tile.firstTimeBuild()) {
 				// Add model
-				game.renderer.growMeshOnTile(
-					game.assets.getModel(this.model),
+				const rng = tile.rng(ctx);
+				const pos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance)
+					.add({ x: 0, y: -0.1, z: 0 });
+				const size = rng.nextF(0.7, 0.8);
+				const zDeg = tile.rot ?? 0;
+
+				ctx.growMeshOnTile(
+					tile.models,
 					tile,
+					ctx.assets.getModel(this.model),
 					new color3(this.color),
-					Anims.BaseDur,
-					centerPos,
+					pos,
 					new float3(size, size, size),
-					Utils3.rotZDeg(tile.rot ?? 0)
+					Utils3.rotZDeg(zDeg),
 				);
 			}
 
-			game.endAndAddCombinedAnim();
+			// Connect to an adjacent path
+			ctx.paths.connectToAny_Adj4(ctx, tile);
 		}
 	},
 	House3: {
 		name: "house3",
 		model: "model_House3",
-		color: Colors.tileHouse3,
-		interact(game, tile) {
-			rotatePathConnection(game, tile);
+		color: Colors3.tileHouse3,
+		interact(ctx, tile) {
+			ctx.paths.rotatePath(ctx, tile);
 		},
-		animCreate(game, tile) {
-			if (!tile.draw) return;
-			game.startCombinedAnim();
-
-			const rng = tile.draw.rng;
-			rng.reset();
-			const offset = this.centerOffset ?? 0;
-			tile.draw.centerPos.set(
-				tile.pos.x + rng.nextF(-offset, offset),
-				tile.pos.y + rng.nextF(-offset, offset),
-				0
-			);
-			const centerPos = tile.draw.centerPos;
-
-			// Calculate house model vars
-			const size = rng.nextF(0.7, 0.8);
-
-			// Connect to adjacent path
-			connectPathToAdj(game, tile);
-
-			if (tile.draw.firstTimeBuild()) {
+		regen(ctx, tile) {
+			if (tile.firstTimeBuild()) {
 				// Add model
-				game.renderer.growMeshOnTile(
-					game.assets.getModel(this.model),
+				const rng = tile.rng(ctx);
+				const pos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
+				const size = rng.nextF(0.7, 0.8);
+				const zDeg = tile.rot ?? 0;
+
+				ctx.growMeshOnTile(
+					tile.models,
 					tile,
+					ctx.assets.getModel(this.model),
 					new color3(this.color),
-					Anims.BaseDur,
-					centerPos,
+					pos,
 					new float3(size, size, size),
-					Utils3.rotZDeg(tile.rot ?? 0)
+					Utils3.rotZDeg(zDeg),
 				);
 			}
 
-			game.endAndAddCombinedAnim();
+			// Connect to an adjacent path
+			ctx.paths.connectToAny_Adj4(ctx, tile);
 		}
 	},
 
 	Path: {
 		name: "path",
 		model: "model_LineCap",
-		color: Colors.tileRoad1,
-		centerOffset: 0,
-		place(game, tile) {
-			game.addScore(tile, 1);
-			game.replaceTile(tile, this);
+		color: Colors3.tileRoad1,
+		centerVariance: 0,
+		place(ctx, tile) {
+			ctx.addScore(tile, 1);
+			ctx.replaceTile(tile, this);
 		},
-		animCreate(game, tile) {
-			if (!tile.draw) return;
+		regen(ctx, tile) {
+			if (tile.firstTimeBuild()) {
+				// Add model
+				const rng = tile.rng(ctx);
+				const pos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
+				const size = rng.nextF(0.5, 0.5);
+				const zDeg = tile.rot ?? 0;
 
-			const rng = tile.draw.rng;
-			rng.reset();
-
-			// Update center position
-			const centerPos = tile.draw.centerPos;
-			const offset = this.centerOffset!;
-			centerPos.set(
-				tile.pos.x + rng.nextF(-offset, offset),
-				tile.pos.y + rng.nextF(-offset, offset),
-				0
-			);
-
-			// Check connected tiles
-			const tileU = game.grid.getTileOffset(tile.pos, +0, +1);
-			const tileL = game.grid.getTileOffset(tile.pos, -1, +0);
-			const tileR = game.grid.getTileOffset(tile.pos, +1, +0);
-			const connectU = isPath(tileU.type);
-			const connectL = isPath(tileL.type);
-			const connectR = isPath(tileR.type);
-
-			let tileUR: Tile | null = null;
-			let connectUR = false;
-			if (!connectU && !connectR) {
-				tileUR = game.grid.getTileOffset(tile.pos, +1, +1);
-				connectUR = isPath(tileUR.type);
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					ctx.assets.getModel(this.model),
+					new color3(this.color),
+					pos,
+					new float3(size, size, size),
+					Utils3.rotZDeg(zDeg),
+				);
 			}
 
-			let tileUL: Tile | null = null;
-			let connectUL = false;
-			if (!connectU && !connectL) {
-				tileUL = game.grid.getTileOffset(tile.pos, -1, +1);
-				connectUL = isPath(tileUL.type);
-			}
+			{
+				// Connect to adjacent paths in the Up/Left/Right directions
+				const adj = ctx.grid.getAdj8(tile.pos);
+				const connectU = PathSystem.isPath(adj.uc);
+				const connectL = PathSystem.isPath(adj.cl);
+				const connectR = PathSystem.isPath(adj.cr);
+				const connectD = PathSystem.isPath(adj.dc);
 
-			const connectionHash = (connectU ? 0x1 : 0) +
-				(connectR ? 0x2 : 0) +
-				(connectUR ? 0x4 : 0) +
-				(connectUL ? 0x8 : 0);
+				updatePath(tile, adj.uc, connectU, false);
+				updatePath(tile, adj.dc, connectD, false);
+				updatePath(tile, adj.cl, connectL, false);
+				updatePath(tile, adj.cr, connectR, false);
+				updatePath(tile, adj.ul, !connectU && !connectL && PathSystem.isPath(adj.ul), true);
+				updatePath(tile, adj.ur, !connectU && !connectR && PathSystem.isPath(adj.ur), true);
+				updatePath(tile, adj.dl, !connectD && !connectL && PathSystem.isPath(adj.dl), true);
+				updatePath(tile, adj.dr, !connectD && !connectR && PathSystem.isPath(adj.dr), true);
+				return;
 
-			if (tile.draw.drawCache["connectionHash"] == connectionHash)
-				return; // Already connected as desired
-			tile.draw.drawCache["connectionHash"] = connectionHash;
-
-			// Destroy all the old models (delayed till after creating the new models)
-			tile.draw.animDestroyAllModels(game, Anims.BaseDur * 0.5);
-
-			// Add center stone
-			const size = rng.nextF(0.5, 0.6);
-			const model = game.renderer.growMeshOnTile(
-				game.assets.getModel(this.model),
-				tile,
-				new color3(this.color),
-				Anims.BaseDur,
-				centerPos,
-				size
-			);
-			model.setName(`${tile.pos.name()}_${tile.type.name}`);
-
-			// Connect to other tiles
-			if (connectU) connectTo(tileU);
-			if (connectR) connectTo(tileR);
-			if (connectUR) connectTo(tileUR!);
-			if (connectUL) connectTo(tileUL!);
-
-			return;
-
-			function connectTo(this, otherTile: Tile) {
-				const targetTile = otherTile;
-				const targetPos = targetTile.getCenterPos();
-
-				buildPath_Lines(game, tile, centerPos, targetPos);
+				function updatePath(tile: Tile, otherTile: Tile, shouldConnect: boolean, forceRemove: boolean) {
+					if (shouldConnect)
+						ctx.paths.connectTiles(ctx, tile.pos, otherTile.pos);
+					else if (otherTile.type == Tiles.Empty || forceRemove)
+						ctx.paths.disconnectTiles(ctx, tile.pos, otherTile.pos);
+				}
 			}
 		}
 	},
-	Bridge: { name: "bridge", color: Colors.tileBridge },
 	Fountain: {
 		name: "fountain",
 		model: "model_Fountain",
-		color: Colors.tileRoad1,
-		centerOffset: 0,
-		animCreate(game, tile) {
-			if (!tile.draw) return;
+		color: Colors3.tileRoad1,
+		centerVariance: 0,
+		regen(ctx, tile) {
+			if (tile.firstTimeBuild()) {
+				const rng = tile.rng(ctx);
+				const pos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
 
-			const rng = tile.draw.rng;
-			rng.reset();
-			const centerPos = tile.draw.recalcCenterPos(tile.pos, this.centerOffset);
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					ctx.assets.getModel(this.model),
+					new color3(this.color),
+					pos,
+				);
+			}
 
-			if (!tile.draw.firstTimeBuild())
-				return;
-
-			game.startCombinedAnim();
-			game.renderer.growMeshOnTile(
-				game.assets.getModel(this.model),
-				tile,
-				new color3(this.color),
-				Anims.BaseDur,
-				centerPos,
-				new float3().setScalar(1),
-				new quat4(),
-			);
-			game.endAndAddCombinedAnim();
+			// Connect to all adjacent paths
+			ctx.paths.connectToAll_Adj4(ctx, tile);
 		},
 	},
 
 	Tree: {
 		name: "tree",
 		model: "model_Tree1",
-		color: Colors.tileTree1,
-		centerOffset: 0.1,
-		place(game, tile) {
-			game.addScore(tile, 1);
-			game.replaceTile(tile, this);
+		icon: {
+			baseDegZ: -60,
 		},
-		animCreate(game, tile) {
-			if (!tile.draw) return;
-
-			const rng = tile.draw.rng;
-			rng.reset();
+		color: Colors3.tileTree1,
+		centerVariance: 0.1,
+		place(ctx, tile) {
+			ctx.addScore(tile, 1);
+			ctx.replaceTile(tile, this);
+		},
+		regen(ctx, tile) {
+			const rng = tile.rng(ctx);
 
 			// Check for neighbouring trees and adjust the center to be near other trees
-			const adj = game.grid.getAdj8(tile.pos);
+			const adj = ctx.grid.getAdj8(tile.pos);
 			const center = new P2(0, 0);
 			let count = 0;
 			function addTileWeight(tile: Tile, x: number, y: number) {
@@ -319,72 +248,59 @@ export const Tiles = {
 				.add({ x: tile.pos.x, y: tile.pos.y, z: 0 });
 
 			// Add random offset
-			const offset = this.centerOffset ?? 0;
-			centerPos.x += tile.draw.rng.nextF(-offset, offset);
-			centerPos.y += tile.draw.rng.nextF(-offset, offset);
+			const offset = this.centerVariance ?? 0;
+			centerPos.x += rng.nextF(-offset, offset);
+			centerPos.y += rng.nextF(-offset, offset);
 
-			if (!tile.draw.firstTimeBuild()) {
-				if (tile.draw.models.length > 0
-					&& !tile.draw.centerPos.equals(centerPos)) {
-					tile.draw.centerPos.copy(centerPos);
-					// Move the model towards the center pos
-					game.addAnim(Anims.moveModel(
-						tile.draw.models[0]!,
-						tile.draw.centerPos
-					));
-				}
+			if (tile.firstTimeBuild()) {
+				// Grow the new model
+				const model = rng.choose(ctx.assets.model_SingleTrees);
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					model,
+					new color3(this.color),
+					centerPos,
+					new float3().setScalar(rng.nextF(0.9, 1)),
+					Utils3.rotZRad(rng.nextRadians())
+				);
 				return;
 			}
-
-			const model = rng.choose(game.assets.model_SingleTrees);
-
-			tile.draw.centerPos = centerPos;
-			game.startCombinedAnim();
-			game.renderer.growMeshOnTile(
-				model,
-				tile,
-				new color3(this.color),
-				Anims.BaseDur,
-				centerPos,
-				new float3().setScalar(rng.nextF(0.9, 1)),
-				Utils3.rotZRad(rng.nextRadians())
-			);
-			game.endAndAddCombinedAnim();
+			else {
+				// Move the existing model
+				ctx.addAnim(Anims.moveModel(
+					tile.models.models[0]!,
+					centerPos
+				));
+			}
 		},
 	},
 
 	Forest: {
 		name: "forest",
 		model: "model_Tree2",
-		color: Colors.tileTree1,
-		centerOffset: 0.05,
-		place(game, tile) {
-			game.addScore(tile, 1);
-			game.replaceTile(tile, this);
+		color: Colors3.tileTree1,
+		centerVariance: 0.05,
+		place(ctx, tile) {
+			ctx.addScore(tile, 1);
+			ctx.replaceTile(tile, this);
 		},
-		animCreate(game, tile) {
-			if (!tile.draw) return;
+		regen(ctx, tile) {
+			if (tile.firstTimeBuild()) {
+				const rng = tile.rng(ctx);
+				const centerPos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
 
-			const rng = tile.draw.rng;
-			rng.reset();
-			const centerPos = tile.draw.recalcCenterPos(tile.pos, this.centerOffset);
-
-			if (!tile.draw.firstTimeBuild())
-				return;
-
-			game.startCombinedAnim();
-			game.renderer.growMeshOnTile(
-				game.assets.getModel(this.model),
-				tile,
-				new color3(this.color),
-				Anims.BaseDur,
-				centerPos,
-				new float3().setScalar(rng.nextF(0.9, 1)),
-				Utils3.rotZRad(rng.nextRadians())
-			);
-			game.endAndAddCombinedAnim();
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					ctx.assets.getModel(this.model),
+					new color3(this.color),
+					centerPos,
+					new float3().setScalar(rng.nextF(0.9, 1)),
+				);
+			}
 		},
 	},
 
-	Water: { name: "water", color: Colors.tileWater },
+	Water: { name: "water", color: Colors3.tileWater },
 } as const satisfies Record<string, TileType>;

@@ -2,19 +2,20 @@ import { IView, AppCtx } from "../AppCtx";
 import { P2 } from "../game/P2";
 import { Frame } from "../game/Frame";
 import { GameAnim } from "../game/GameAnims";
-import { GameState } from "../game/GameState";
-import { GameRenderer } from "../game/GameRenderer";
-import { TileType } from "../game/Tile";
+import { CTX, GameState } from "../game/GameState";
+import { GameRenderer } from "../game/render/GameRenderer";
+import { Tile, TileType } from "../game/Tile";
 
 export const BuildTimestamp = __BUILD_TIMESTAMP__;
-export const BuildID = "brilliant";
+export const BuildID = "bezier";
 
 export class GameView implements IView {
 	private ctx: AppCtx;
-	private boardElem: HTMLElement | null | undefined;
-	private gameActionsElem: HTMLElement | null | undefined;
-	private scoreElem: HTMLElement | null | undefined;
-	private nextItemButton: HTMLElement | null | undefined;
+	private boardElem!: HTMLElement;
+	private gameActionsElem!: HTMLElement;
+	private gameActionsOptsElem!: HTMLElement;
+	private scoreElem!: HTMLElement;
+	private nextItemButton!: HTMLElement;
 
 	private game: GameState = new GameState();
 	private selectedItem: TileType | null = null;
@@ -24,7 +25,7 @@ export class GameView implements IView {
 		this.ctx = ctx;
 	}
 
-	enter(ctx: AppCtx): void {
+	async enter(ctx: AppCtx): Promise<void> {
 		ctx.root.innerHTML = /*html*/`
 <div class="game-ctr">
 	<div class="game">
@@ -55,30 +56,30 @@ export class GameView implements IView {
 				<div class="button-icon icon-20s"></div>
 				<!--<button id="undoGameButton" class="button-icon icon-reset icon-20s"></button>-->
 			</div>
+			<div id="gameActionOptions" class="game-actions-row"></div>
 			<button id="nextItemButton"></button>
-			<div class="game-icons-preview"></div>
+			<!--<div class="game-icons-full-preview"></div>-->
 		</section>
 	</div>
 </div>
 		`;
 
-		this.boardElem = ctx.root.querySelector("#gameBoard");
-		if (this.boardElem == null) return;
+		this.boardElem = this.getElementOrThrow("#gameBoard");
 
 		// Setup renderer
-		this.renderer.setupAsync(this.boardElem, this.game);
+		await this.renderer.setupAsync(this.boardElem, this.game);
 
 		// Get required elements
-		this.gameActionsElem = ctx.root.querySelector("#gameActions");
-		if (this.gameActionsElem == null) return;
-		this.nextItemButton = this.gameActionsElem.querySelector("#nextItemButton");
+		this.gameActionsElem = this.getElementOrThrow("#gameActions");
+		this.gameActionsOptsElem = this.getElementOrThrow("#gameActionOptions");
+		this.nextItemButton = this.getElementOrThrow("#nextItemButton");
+		this.game.score.meterElem = this.getElementOrThrow("#scoreMeter");
 
 		// Setup Game State
-		this.game.setup();
+		this.game.setupGame();
 		this.selectNextItem();
 
 		// Connect Game Listeners
-		this.game.score.meterElem = this.gameActionsElem.querySelector("#scoreMeter");
 		this.game.score.updateVisuals();
 
 		// Add button click handlers
@@ -89,23 +90,22 @@ export class GameView implements IView {
 		window.addEventListener('keydown', this.handleKeyPress);
 
 		addClick("#resetGameButton", this.resetGame);
-		this.nextItemButton?.addEventListener('click', this.selectNextItem);
+		this.nextItemButton.addEventListener('click', this.selectNextItem);
 
 		// Start Game Loop
 		this.loop(0);
+		return;
 
 		function addClick(
 			query: string,
 			handler: EventListenerOrEventListenerObject
 		) {
 			ctx.root.querySelectorAll(query)
-				.forEach(elem => {
-					elem.addEventListener('click', handler);
-				});
+				.forEach(elem => elem.addEventListener('click', handler));
 		}
 	}
 
-	exit(ctx): void { }
+	async exit(ctx): Promise<void> { }
 
 	private prevTimestamp: DOMHighResTimeStamp = 0;
 	loop(timestamp: DOMHighResTimeStamp) {
@@ -114,33 +114,41 @@ export class GameView implements IView {
 		this.prevTimestamp = timestamp;
 		let frame = new Frame(timestamp, safeDelta);
 
-		this.updateAnims(safeDelta);
-		this.renderer.draw(frame);
+		try {
+			this.updateAnims(safeDelta);
+			this.renderer.draw(frame);
+		} catch (err) {
+			console.error(err);
+		}
 
 		requestAnimationFrame(timestamp => this.loop(timestamp));
 	}
 
 	resetGame = () => {
-		this.game.reset();
+		const ctx = new CTX(this.game);
+		ctx.resetGame();
+		ctx.finalize();
 		this.playNextAnim();
 	}
 
 	clickTile(pos: P2) {
 		// console.log(`clicked ${pos.name()}`);
-		const tile = this.game.grid.getTile(pos);
+		const ctx = new CTX(this.game);
+		const tile = ctx.game.grid.get(pos);
 		if (this.selectedItem
-			&& this.game.canPlaceTile(tile, this.selectedItem)) {
+			&& ctx.canPlaceTile(tile, this.selectedItem)) {
+			ctx.placeTile(tile, this.selectedItem);
+			ctx.finalize();
 
-			this.game.placeTile(tile, this.selectedItem);
 			this.playNextAnim();
-
-			this.hoverTileStart(pos);
+			this.hoverTileEnd();
 			return;
 		}
 
-		if (this.game.tryInteractTile(tile)) {
+		if (ctx.tryInteractTile(tile)) {
+			ctx.finalize();
 			this.playNextAnim();
-			this.hoverTileStart(pos);
+			this.hoverTileEnd();
 			return;
 		}
 
@@ -153,7 +161,7 @@ export class GameView implements IView {
 	private hoverPos: P2 | null = null;
 	hoverTileStart(pos: P2) {
 		this.hoverPos = pos;
-		const tile = this.game.grid.getTile(this.hoverPos);
+		const tile = this.game.grid.get(this.hoverPos);
 		const canInteract = this.selectedItem != null
 			&& this.game.canPlaceTile(tile, this.selectedItem);
 		this.renderer.hoverTile(tile, canInteract, this.selectedItem);
@@ -182,13 +190,41 @@ export class GameView implements IView {
 			}
 		}
 	}
+	selectItem = (index: number) => {
+		this.selectedItem = this.game.items[index]?.type ?? null;
+		this.updateItemDisplay();
+	}
+
 	private updateItemDisplay() {
 		// Retrigger hovering to update preview model
 		if (this.hoverPos)
 			this.hoverTileStart(this.hoverPos);
 
-		if (!this.nextItemButton) return;
 		this.nextItemButton.textContent = `${this.selectedItem?.name ?? 'None'}`;
+
+		let itemsHtml = "";
+
+		const iconCount = 8 - 1;
+		for (let i = 0; i < this.game.items.length; ++i) {
+			const item = this.game.items[i]!;
+			const iconPos = item.icon.iconPos;
+			const imgPosX = 100 * (iconPos.x / iconCount);
+			const imgPosY = 100 * (iconPos.y / iconCount);
+
+			const selectedClass = item.type == this.selectedItem ? " game-act-icon-selected" : "";
+			itemsHtml += /*html*/`
+<div class="game-act-icons">
+	<div id="gameAct_${i}" class="game-act-icon${selectedClass}" style="--icon-x-pos: ${imgPosX}%; --icon-y-pos: ${imgPosY}%;"></div>
+</div>
+`;
+		}
+		this.gameActionsOptsElem.innerHTML = itemsHtml;
+
+		for (let i = 0; i < this.game.items.length; ++i) {
+			const elem = this.getElementOrThrow(`#gameAct_${i}`, this.gameActionsOptsElem);
+			const index = i;
+			elem.addEventListener('pointerdown', () => this.selectItem(index));
+		}
 	}
 
 	//#region Visual State
@@ -238,7 +274,7 @@ export class GameView implements IView {
 	}
 
 	updateScore() {
-		this.scoreElem!.innerHTML = `${this.game.score}`;
+		this.scoreElem!.innerHTML = `${this.game.score} `;
 	}
 
 	//#endregion Visual State
@@ -270,8 +306,8 @@ export class GameView implements IView {
 				}
 				else {
 					const debugFrame = () => {
-						for (const tile of this.game.grid.tiles) {
-							const centerPos = tile.getCenterPos();
+						for (const tile of this.game.grid.cells) {
+							const centerPos = Tile.calcVisualCenterPos(tile.pos);
 
 							if (tile.shouldCheck)
 								this.game.renderer.addFloatingDebugText(
@@ -344,4 +380,11 @@ export class GameView implements IView {
 	}
 
 	//#endregion Input Handlers
+
+	private getElementOrThrow(selector: string, root?: HTMLElement): HTMLElement {
+		if (!root) root = this.ctx.root;
+		const elem = root.querySelector<HTMLElement>(selector);
+		if (!elem) throw `Could not find element '${selector}' on '${root.localName}#${root.id}.${root.className}'`;
+		return elem;
+	}
 }

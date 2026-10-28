@@ -71,8 +71,8 @@ export class RandomSlice {
 		obj.values = this.values;
 		obj._start = next % this.values.length;
 		obj._index = obj._start;
-		obj._step = step ?? next;
-		if (obj._step == 0)
+		obj._step = step ?? 1;
+		if (obj._step <= 0)
 			obj._step = 1;
 		return obj;
 	}

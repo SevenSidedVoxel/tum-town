@@ -1,4 +1,4 @@
-import { GameState } from "./GameState";
+import { CTX, GameState } from "./GameState";
 import { Tile, TileType } from "./Tile";
 import { Tiles } from "./_tiles_";
 
@@ -48,20 +48,20 @@ export class Area3x3 {
 	}
 }
 
-export class Adj4 {
+export class Adj4<T> {
 	constructor(
-		public uc: Tile,
-		public dc: Tile,
-		public cl: Tile,
-		public cr: Tile,
+		public uc: T,
+		public dc: T,
+		public cl: T,
+		public cr: T,
 	) { }
 }
 
-export class Adj8 {
+export class Adj8<T> {
 	constructor(
-		public ul: Tile, public uc: Tile, public ur: Tile,
-		public cl: Tile, public cr: Tile,
-		public dl: Tile, public dc: Tile, public dr: Tile
+		public ul: T, public uc: T, public ur: T,
+		public cl: T, public cr: T,
+		public dl: T, public dc: T, public dr: T
 	) { }
 }
 
@@ -79,12 +79,12 @@ export class Rule {
 	public name: string;
 	public match: Match3x3;
 	public matchFlags: MatchFlags;
-	public apply: (game: GameState, area: Area3x3, rot: number) => void;
+	public apply: (ctx: CTX, area: Area3x3, rot: number) => void;
 
 	constructor(
 		name: string,
 		match: Partial<Match3x3>,
-		apply: (game: GameState, area: Area3x3, rot: number) => void,
+		apply: (ctx: CTX, area: Area3x3, rot: number) => void,
 		matchFlags?: MatchFlags
 	) {
 		this.name = name;

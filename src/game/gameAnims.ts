@@ -1,8 +1,8 @@
-import { Colors, Colors3 } from "../styles/colors";
-import { color3, float3, quat4 } from "../utils/threeUtils";
-import { BatchedInstance } from "./GameRenderer";
+import { Colors3 } from "../styles/colors";
+import { float3, quat4 } from "../utils/threeUtils";
 import { GameState } from "./GameState";
 import { clamp01, lerp, P2 } from "./P2";
+import { BatchedInstance } from "./render/BatchedInstance";
 
 export class Ease {
 	public static popIn(t: number) { return 2.5 * t - 1.5 * t * t; }
@@ -75,16 +75,29 @@ export class GameAnim {
 export namespace Anims {
 	export const BaseDur = 1;
 
-	export function combined(anims: (GameAnim | undefined)[]) {
+	export function combined(anims: (GameAnim | undefined)[]): GameAnim | undefined {
+		anims = anims.filter(a => a);
+		if (anims.length < 1)
+			return;
+		if (anims.length == 1)
+			return anims[0];
+
 		// Get the maximum duration
 		let duration = 0;
 		for (const anim of anims) {
-			if (!anim) continue;
-			duration = Math.max(duration, anim.delay + anim.duration);
+			duration = Math.max(duration, anim!.delay + anim!.duration);
 		}
 
+		// Create a useful name
+		let name = "[";
+		for (let i = 0; i < anims.length; i++) {
+			if (i != 0) name += "+";
+			name += anims[i]?.name;
+		}
+		name += "]";
+
 		return new GameAnim({
-			name: combined.name,
+			name: name,
 			duration: duration,
 			start: function () {
 				anims.forEach(anim => anim?.start?.());
@@ -243,6 +256,8 @@ export namespace Anims {
 		models: BatchedInstance[],
 		duration: number = Anims.BaseDur
 	) {
+		if (models.length < 1)
+			return null;
 		return Anims.combined(models.map(
 			m => Anims.destroyModel(m, duration)
 		));

@@ -1,6 +1,6 @@
 export interface IView {
-	enter(ctx: AppCtx): void;
-	exit(ctx: AppCtx): void;
+	enter(ctx: AppCtx): Promise<void>;
+	exit(ctx: AppCtx): Promise<void>;
 }
 
 export class AppCtx {
@@ -11,10 +11,10 @@ export class AppCtx {
 		this.root = root;
 	}
 
-	public changeView(view: IView | null) {
-		this.currView?.exit(this);
+	public async changeView(view: IView | null) {
+		await this.currView?.exit(this);
 		this.currView = view;
-		this.currView?.enter(this);
+		await this.currView?.enter(this);
 	}
 
 	public addClickHandler(id: string, handler: EventListenerOrEventListenerObject) {

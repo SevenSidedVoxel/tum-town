@@ -241,13 +241,39 @@
   padding: 5px;
 }
 
-.game-icons-preview {
+.game-icons-full-preview {
+  aspect-ratio: 1;
+  background-color: #202020;
+  background-image: var(--img-game-icons);
+  background-position: 0 0;
+  background-repeat: no-repeat;
+  background-size: 100%;
+  width: 100%;
+}
+
+.game-act-icons {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items:  center;
+  width: 100%;
+}
+
+.game-act-icon {
   aspect-ratio: 1;
   background-image: var(--img-game-icons);
-  background-position: center;
+  background-size: var(--img-game-icons-full-scale);
+  background-position: var(--icon-x-pos) var(--icon-y-pos);
   background-repeat: no-repeat;
-  background-size: contain;
+  background-color: var(--col-bgBtn);
+  border-radius: 10px;
   width: 100%;
+  margin: 10px;
+}
+
+.game-act-icon-selected {
+  border: 2px solid var(--col-bgBtnBorder);
+  margin: 0;
 }
 
 /* src/styles/credits.css */
@@ -312,8 +338,9 @@
   --col-textMuted: #778da6;
   --col-shadow: #00000080;
   --col-border: #778da6;
-  --col-bgBtn: #151618;
+  --col-bgBtn: #1d1e21;
   --col-bgBtnHover: #2c2d2f;
+  --col-bgBtnBorder: #8d7270;
   --col-tileLight: #242a34;
   --col-tileDark: #1d222b;
   --col-tileBorder: #1d2831;
@@ -376,7 +403,7 @@
   }
 }
 
-/* src/index.css */
+/* src/styles/_index_.css */
 :root {
   color: var(--col-textDefault);
   font-family: var(--font-body);
@@ -502,7 +529,7 @@ h2, .head {
 button {
   background-color: var(--col-bgBtn);
   color: var(--col-textAccent);
-  border: 1px solid var(--col-textAccent);
+  border: 1px solid var(--col-bgBtnBorder);
   cursor: pointer;
   border-radius: 6px;
   padding: 10px 18px;
@@ -546,3 +573,6 @@ button:active {
   color: var(--color-text-muted);
   opacity: .6;
 }
+
+/* src/index.css */
+

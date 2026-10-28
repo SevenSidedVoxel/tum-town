@@ -14,8 +14,9 @@
 	"shadow": "#00000080",
 	"border": "#778da6",
 
-	"bgBtn": "#151618",
+	"bgBtn": "#1d1e21",
 	"bgBtnHover": "#2c2d2f",
+	"bgBtnBorder": "#8d7270",
 
 	"tileLight": "#242a34",
 	"tileDark": "#1d222b",

@@ -150,11 +150,39 @@
 	text-align: center;
 }
 
-.game-icons-preview {
+.game-icons-full-preview {
+	width: 100%;
+	aspect-ratio: 1/1;
+	background-color: #202020;
+	background-image: var(--img-game-icons);
+	background-size: 100%;
+	background-position: 0 0;
+	background-repeat: no-repeat;
+}
+
+.game-act-icons {
+	width: 100%;
+	display: flex;
+	flex-direction: row;
+	justify-content: center;
+	align-items: center;
+}
+
+.game-act-icon {
 	width: 100%;
 	aspect-ratio: 1/1;
 	background-image: var(--img-game-icons);
-	background-size: contain;
+	background-size: var(--img-game-icons-full-scale);
+	background-position: var(--icon-x-pos) var(--icon-y-pos);
 	background-repeat: no-repeat;
-	background-position: center;
+
+	margin: 10px;
+	border-radius: 10px;
+	background-color: var(--col-bgBtn);
+}
+
+.game-act-icon-selected {
+	border: 2px solid var(--col-bgBtnBorder);
+
+	margin: 0px;
 }

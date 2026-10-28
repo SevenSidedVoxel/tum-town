@@ -3,25 +3,253 @@ import { Anims, GameAnim } from "./GameAnims";
 import { TileType, Tile } from "./Tile";
 import { Tiles } from "./_tiles_";
 import { makeRules } from "./_rules_";
-import { GameRenderer } from "./GameRenderer";
+import { GameRenderer } from "./render/GameRenderer";
 import { RandomSlice } from "./SeededRandom";
 import { Area3x3, isTile, MatchFlags, Rule } from "./Rule";
 import { ProgressionMeter } from "./ProgressionMeter";
 import { Grid } from "./Grid";
 import { Item } from "./Item";
+import { PathSystem } from "./PathSystem";
+import { ModelCollection } from "./ModelCollection";
+import { color3, float3, quat4 } from "../utils/threeUtils";
+import { BatchedInstance } from "./render/BatchedInstance";
+import { Colors3 } from "../styles/colors";
+
+export class CTX {
+	public game: GameState;
+
+	public get grid() { return this.game.grid; }
+	public get paths() { return this.game.paths; }
+
+	public get renderer() { return this.game.renderer; }
+	public get assets() { return this.game.assets; }
+
+	constructor(game: GameState) {
+		this.game = game;
+	}
+
+	public finalize() {
+		// Flush animations
+		this.flushAnimations();
+	}
+
+	public resetGame() {
+		this.game.clearGame();
+
+		this.regenVisuals();
+		// this.game.skipAnims();
+
+		this.game.setupGame();
+	}
+
+	//#region Visual Regen
+
+	public afterRegenHandlers: (() => void)[] = [];
+
+	public regenVisuals() {
+		this.startCombinedAnim();
+		for (const tile of this.grid.cells) {
+			if (!tile.shouldRegen) continue;
+			tile.regenTile(this);
+		}
+
+		this.paths.regen(this);
+
+		this.afterRegenHandlers.forEach(afterRegen => afterRegen());
+		this.endAndAddCombinedAnim();
+	}
+
+	//#endregion Visual Regen
+
+	//#region Animations
+
+	private _prevAnimLists: GameAnim[][] = [];
+	private _currAnimList: GameAnim[] = [];
+
+	public addAnim(anim: GameAnim | null | undefined) {
+		if (!anim) return;
+		this._currAnimList.push(anim);
+		// console.log("addAnim", anim.name);
+		return anim;
+	}
+
+	public startCombinedAnim() {
+		this._prevAnimLists.push(this._currAnimList);
+		this._currAnimList = [];
+	}
+
+	public endCombinedAnim() {
+		if (this._prevAnimLists.length < 1)
+			throw "Unexpected end of combined animation";
+
+		let anim: GameAnim | undefined;
+		if (this._currAnimList.length == 1 && this._currAnimList[0])
+			anim = this._currAnimList[0];
+		else if (this._currAnimList.length > 1)
+			anim = Anims.combined(this._currAnimList);
+		else
+			anim = undefined;
+		if (anim)
+			console.log("end combined anim", this._currAnimList.length, anim);
+
+		const prevList = this._prevAnimLists.pop()!;
+		this._currAnimList = prevList;
+		return anim;
+	}
+	public endAndAddCombinedAnim() {
+		const anim = this.endCombinedAnim();
+		this.addAnim(anim);
+	}
+
+	private flushAnimations() {
+		if (this._prevAnimLists.length != 0)
+			throw "A combined animation was not ended";
+
+		this.game.addAnims(this._currAnimList);
+		this._currAnimList.length = 0;
+	}
+
+	//#endregion Animations
+
+	//#region Tile Actions
+
+	public tryInteractTile(tile: Tile) {
+		if (tile.type.interact) {
+			tile.type.interact(this, tile);
+			this.regenVisuals();
+			return true;
+		}
+
+		return false;
+	}
+
+	public canPlaceTile(tile: Tile, type: TileType) { return this.game.canPlaceTile(tile, type); }
+
+	public placeTile(tile: Tile, type: TileType) {
+		if (!this.canPlaceTile(tile, type))
+			return; // Cannot place
+
+		this.game.consumeItem(type);
+
+		// Place item
+		if (type.place)
+			type.place(this, tile);
+		else
+			this.replaceTile(tile, type);
+		this.regenVisuals();
+
+		// Apply rules
+		this.game.applyRules(this);
+		this.regenVisuals();
+	}
+
+	public replaceTile(tile: Tile, type: TileType, rot: number | null = null) {
+		if (type == Tiles.Empty || tile.type == Tiles.Empty) {
+			this.game.setTileType(tile, type, rot);
+
+			// Tile is already empty or becoming empty,
+			//   so just use a single animation
+			tile.regenTile(this);
+			return;
+		}
+
+		// Update data
+		this.game.setTileType(tile, type, rot);
+
+		// Animate the replacement of tile models
+		if (tile.type.regen) {
+			Tiles.Empty.regen(this, tile);
+			tile.regenTile(this);
+		}
+	}
+
+	public mergeTilesInto(
+		targetTile: Tile,
+		tiles: Tile[],
+		type: TileType,
+		rot: number | null = null) {
+		// Update Data
+		for (const tile of tiles)
+			this.game.setTileType(tile, Tiles.Empty, null);
+		this.game.setTileType(targetTile, type, rot);
+
+		// Update Visuals
+		console.log("Start merge to " + targetTile.pos.name())
+		this.startCombinedAnim();
+		const duration = Anims.BaseDur;
+
+		// Merge adjacent tiles
+		const targetPos = Tile.calcVisualCenterPos(targetTile.pos);
+		for (const tile of tiles)
+			this.addAnim(tile.mergeModels_anim(this, targetPos, duration));
+
+		// Destroy center tile
+		this.addAnim(targetTile.destroyModels_anim(this, duration * 0.5));
+
+		// Create center tile
+		const delay = 0.5 * duration;
+		let regenAnim = targetTile.regenTile_anim(this);
+		this.addAnim(regenAnim?.delayed(delay));
+
+		this.endAndAddCombinedAnim();
+	}
+
+	//#endregion Tile Actions
+
+	//#region Model Creation
+
+	public growMeshOnTile(
+		collection: ModelCollection,
+		tile: Tile,
+		modelID: number,
+		color: color3,
+		pos: float3 = new float3(tile.pos.x, tile.pos.y, 0),
+		scale: float3 = new float3().setScalar(1),
+		rot: quat4 = new quat4(),
+		duration: number = Anims.BaseDur,
+		delay: number = 0,
+	): BatchedInstance {
+		// Create initial model
+		const model = this.renderer.addModel(
+			modelID,
+			new float3(tile.pos.x, tile.pos.y, 0),
+			0,
+			color,
+			collection);
+
+		// Animate to target transform
+		this.addAnim(Anims.growModelTRS(
+			model, pos, rot, scale as float3, duration
+		).delayed(delay));
+
+		return model;
+	}
+
+	//#endregion Model Creation
+
+	//#region GameState Access
+
+	public addScore(tile: Tile, s: number) { return this.game.addScore(tile, s); }
+	public addPop(tile: Tile, p: number) { return this.game.addPop(tile, p); }
+	public addNat(tile: Tile, n: number) { return this.game.addNat(tile, n); }
+
+	//#endregion GameState Access
+}
 
 export class GameState {
-	public score!: ProgressionMeter;
+	public rng = new RandomSlice(Math.random(), 1024);
 
+	public score: ProgressionMeter = new ProgressionMeter(0, 0, 0);
 	public population: number = 0;
 	public nature: number = 0;
 	private _actIndex: number = 0;
 
-	public grid: Grid = new Grid();
+	public grid: Grid<Tile>;
+	public paths: PathSystem;
+
 	public rules: Rule[] = makeRules();
 	public items: Item[] = [];
 	public anims: GameAnim[] = [];
-	public rng = new RandomSlice(Math.random(), 1024);
 	public isCreative = true;
 
 	public renderer: GameRenderer = new GameRenderer();
@@ -29,10 +257,16 @@ export class GameState {
 
 	//#region Setup
 
-	public setup() {
+	constructor() {
+		this.grid = new Grid(10,
+			new Tile(new P2(-1, -1), Tiles.Empty),
+			pos => new Tile(pos, Tiles.Empty));
+		this.paths = new PathSystem();
+	}
+
+	public setupGame() {
 		this._actIndex = 0;
 
-		this.score = new ProgressionMeter(0, 0, 0);
 		this.advanceScoreProgression();
 
 		this.population = 0;
@@ -44,15 +278,30 @@ export class GameState {
 		this.addItem(Tiles.Tree, 1);
 	}
 
-	public reset() {
+	public clearGame() {
 		// reset grid
-		for (const tile of this.grid.tiles) {
+		for (const tile of this.grid.cells) {
 			tile.reset();
 		}
+	}
 
-		this.regenVisuals();
-		// this.skipAnims();
-		this.setup();
+	//#endregion Setup
+
+	//#region Animations
+
+	private _animList: GameAnim[] = this.anims;
+
+	public addAnim(anim: GameAnim | undefined) {
+		if (!anim) return;
+		this._animList.push(anim);
+		return anim;
+	}
+
+	public addAnims(anims: GameAnim[]) {
+		for (const anim of anims) {
+			if (anim)
+				this._animList.push(anim);
+		}
 	}
 
 	public skipAnims() {
@@ -60,55 +309,7 @@ export class GameState {
 		this.anims.length = 0;
 	}
 
-	//#endregion Setup
-
-	//#region Visuals
-
-	private _combinedAnimStack: GameAnim[][] = [];
-	private _currAnimList: GameAnim[] = this.anims;
-
-	public addAnim(anim: GameAnim | undefined) {
-		if (!anim) return;
-		this._currAnimList.push(anim);
-		return anim;
-	}
-
-	public startCombinedAnim() {
-		this._combinedAnimStack.push(this._currAnimList);
-		this._currAnimList = [];
-	}
-
-	public endCombinedAnim() {
-		if (this._combinedAnimStack.length < 1)
-			throw "Unexpected end of combined animation";
-
-		let anim: GameAnim | undefined;
-		const prevList = this._combinedAnimStack.pop()!;
-		if (this._currAnimList.length == 1 && this._currAnimList[0])
-			anim = this._currAnimList[0];
-		else if (this._currAnimList.length > 1)
-			anim = Anims.combined(this._currAnimList);
-		else
-			anim = undefined;
-
-		this._currAnimList = prevList;
-		return anim;
-	}
-	public endAndAddCombinedAnim() {
-		const anim = this.endCombinedAnim();
-		this.addAnim(anim);
-	}
-
-	public regenVisuals() {
-		this.startCombinedAnim();
-		for (const tile of this.grid.tiles) {
-			if (!tile.shouldRegen) continue;
-			tile.regen(this);
-		}
-		this.endAndAddCombinedAnim();
-	}
-
-	//#endregion Visuals
+	//#endregion Animations
 
 	//#region Progression
 
@@ -162,7 +363,7 @@ export class GameState {
 		return Anims.addCount(this, tile.pos, n);
 	}
 
-	private setTileType(tile: Tile, type: TileType, rot: number | null = null) {
+	public setTileType(tile: Tile, type: TileType, rot: number | null = null) {
 		if (tile.type === type)
 			return;
 
@@ -174,117 +375,11 @@ export class GameState {
 
 		this.markForCheck(tile.pos.x, tile.pos.y);
 		this.markAdjForCheck(tile.pos);
-
-		if (tile.draw)
-			tile.draw.drawCache = {};
 	}
-
-	public replaceTile(tile: Tile, type: TileType, rot: number | null = null) {
-		// Update Data
-		this.setTileType(tile, type, rot);
-
-		if (type == Tiles.Empty || tile.type == Tiles.Empty) {
-			// Tile is already empty or becoming empty,
-			//   so just use a single animation
-			tile.regen(this);
-			return;
-		}
-
-		// Animate the replacement of tile models
-		if (tile.type.animCreate) {
-			Tiles.Empty.animCreate(this, tile);
-			tile.regen(this);
-		}
-	}
-
-	public mergeTilesInto(
-		targetTile: Tile,
-		tiles: Tile[],
-		type: TileType,
-		rot: number | null = null) {
-		// Update Data
-		for (const tile of tiles)
-			this.setTileType(tile, Tiles.Empty, null);
-		this.setTileType(targetTile, type, rot);
-
-		// Update Visuals
-		if (!targetTile.draw) return;
-
-		console.log("Start merge to " + targetTile.pos.name())
-		this.startCombinedAnim();
-
-		// Merge adjacent tiles
-		const targetPos = targetTile.draw.centerPos;
-		for (const tile of tiles) {
-			if (!tile.draw) continue;
-			this.addAnim(tile.draw
-				.mergeModelsInto(targetPos, Anims.BaseDur));
-		}
-
-		// Destroy center tile
-		targetTile.draw.animDestroyAllModels(this, Anims.BaseDur);
-
-		// Create center tile
-		const delay = 0.25 * Anims.BaseDur;
-		this.startCombinedAnim();
-		targetTile.regen(this);
-		let combAnim = this.endCombinedAnim();
-		this.addAnim(
-			combAnim?.delayed(delay)
-		);
-
-		this.endAndAddCombinedAnim();
-	}
-
-	//#endregion State Modification
-
-	//#region Items
-
-	public addItem(type: TileType, count?: number) {
-		count ??= 1;
-		for (const item of this.items) {
-			if (item.type === type) {
-				item.count += count;
-				return;
-			}
-		}
-
-		this.items.push(new Item(type, count));
-	}
-
-	private hasItem(type: TileType) {
-		for (const item of this.items) {
-			if (item.type === type
-				&& item.count > 0)
-				return true;
-		}
-
-		return false;
-	}
-
-	private consumeItem(type: TileType) {
-		if (this.isCreative)
-			return;
-
-		for (const [index, item] of this.items.entries()) {
-			if (item.type !== type)
-				continue;
-
-			item.count--;
-			if (item.count < 1)
-				this.items.splice(index, 1);
-
-			return;
-		}
-	}
-
-	//#endregion Items
-
-	//#region Rule Application
 
 	public canPlaceTile(tile: Tile, type: TileType) {
 		// Ensure the tile is available
-		if (!this.isCreative && !this.hasItem(type))
+		if (!this.hasItem(type))
 			return false; // no item
 
 		// Check if the tile type has a custom placement function
@@ -297,30 +392,61 @@ export class GameState {
 		return true;
 	}
 
-	public placeTile(tile: Tile, type: TileType) {
-		if (!this.canPlaceTile(tile, type))
-			return; // Cannot place
+	//#endregion State Modification
 
-		this.consumeItem(type);
-		if (type.place)
-			type.place(this, tile);
-		else
-			this.replaceTile(tile, type);
+	//#region Items
 
-		// Update game state
-		this.applyRules();
-		this.regenVisuals();
-	}
-
-	public tryInteractTile(tile: Tile) {
-		if (tile.type.interact) {
-			tile.type.interact(this, tile);
-			this.regenVisuals();
+	public hasItem(type: TileType) {
+		if (this.isCreative)
 			return true;
+
+		for (const item of this.items) {
+			if (item.type === type
+				&& item.count > 0)
+				return true;
 		}
 
 		return false;
 	}
+
+	public addItem(type: TileType, count?: number) {
+		count ??= 1;
+		for (const item of this.items) {
+			if (item.type === type) {
+				item.count += count;
+				return;
+			}
+		}
+
+		const icon = this.renderer.addModelIcon(
+			this.assets.getModel(type.model),
+			type.color ?? Colors3.white,
+			type.icon);
+		const item = new Item(type, count, icon);
+		this.items.push(item);
+	}
+
+	public consumeItem(type: TileType) {
+		if (this.isCreative)
+			return;
+
+		for (const [index, item] of this.items.entries()) {
+			if (item.type !== type)
+				continue;
+
+			item.count--;
+			if (item.count < 1) {
+				this.renderer.freeIcon(item.icon);
+				this.items.splice(index, 1);
+			}
+
+			return;
+		}
+	}
+
+	//#endregion Items
+
+	//#region Rule Application
 
 	private tilesToCheck: number = 0;
 
@@ -329,7 +455,7 @@ export class GameState {
 			|| y <= 0 || y >= this.grid.size - 1)
 			return; // Out of bounds or on edge
 
-		const tile = this.grid.getTile(x, y);
+		const tile = this.grid.get(x, y);
 		if (!tile.shouldCheck) {
 			// console.log(`To Check ${tile.pos.name()}`);
 
@@ -360,12 +486,12 @@ export class GameState {
 
 	public get hasUnappliedRules() { return this.tilesToCheck > 0; }
 
-	public applyRules() {
+	public applyRules(ctx: CTX) {
 		while (this.hasUnappliedRules)
-			this.applyRulesOnce();
+			this.applyRulesOnce(ctx);
 	}
 
-	public applyRulesOnce() {
+	public applyRulesOnce(ctx: CTX) {
 		if (!this.hasUnappliedRules)
 			return;
 
@@ -375,20 +501,20 @@ export class GameState {
 		let rotToApply = 0;
 
 		// Check all tiles that require checking
-		for (const cc of this.grid.tiles) {
+		for (const cc of this.grid.cells) {
 			if (!cc.shouldCheck) continue;
 
 			let examinedAllRules = true;
 
 			const pos = cc.pos;
-			const tl = this.grid.getTile(pos.x - 1, pos.y + 1);
-			const tc = this.grid.getTile(pos.x + 0, pos.y + 1);
-			const tr = this.grid.getTile(pos.x + 1, pos.y + 1);
-			const cl = this.grid.getTile(pos.x - 1, pos.y + 0);
-			const cr = this.grid.getTile(pos.x + 1, pos.y + 0);
-			const bl = this.grid.getTile(pos.x - 1, pos.y - 1);
-			const bc = this.grid.getTile(pos.x + 0, pos.y - 1);
-			const br = this.grid.getTile(pos.x + 1, pos.y - 1);
+			const tl = this.grid.get(pos.x - 1, pos.y + 1);
+			const tc = this.grid.get(pos.x + 0, pos.y + 1);
+			const tr = this.grid.get(pos.x + 1, pos.y + 1);
+			const cl = this.grid.get(pos.x - 1, pos.y + 0);
+			const cr = this.grid.get(pos.x + 1, pos.y + 0);
+			const bl = this.grid.get(pos.x - 1, pos.y - 1);
+			const bc = this.grid.get(pos.x + 0, pos.y - 1);
+			const br = this.grid.get(pos.x + 1, pos.y - 1);
 
 			let rot000 = new Area3x3(tl, tc, tr, cl, cc, cr, bl, bc, br);
 			let rot090 = new Area3x3(bl, cl, tl, bc, cc, tc, br, cr, tr);
@@ -456,7 +582,7 @@ export class GameState {
 		// If we found a rule, apply it
 		if (ruleToApply !== null) {
 			console.log(`Applying rule '${ruleToApply.name}' at ${areaToApply!.cc.pos.name()}`);
-			ruleToApply.apply(this, areaToApply!, rotToApply);
+			ruleToApply.apply(ctx, areaToApply!, rotToApply);
 		}
 		// else console.log(`No rule to apply`);
 	}

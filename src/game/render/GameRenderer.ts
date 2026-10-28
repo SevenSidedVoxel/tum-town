@@ -1,19 +1,21 @@
 import * as THREE from 'three';
 import { GLTF, GLTFLoader } from "three/examples/jsm/Addons.js";
-import { P2 } from "./P2";
+import { P2 } from "../P2";
 
-import glbModelsUrl from '../data/models.glb';
+import glbModelsUrl from '../../data/models.glb';
 
-import { Frame as Frame } from './Frame';
-import { GameState } from './GameState';
+import { Frame as Frame } from '../Frame';
+import { GameState } from '../GameState';
 
-import '../utils/domUtils';
-import '../utils/threeUtils';
-import { Tile, TileDraw, TileType } from './Tile';
+import '../../utils/domUtils';
+import '../../utils/threeUtils';
+import { Tile, TileIcon as IconInfo, TileType } from '../Tile';
+import { ModelCollection } from "../ModelCollection";
 import { BatchedMesh } from 'three';
-import { Colors, Colors3 } from '../styles/colors';
-import { color3, float2, float3, float4, mat4x4, quat4, Utils3 } from "../utils/threeUtils";
-import { Anims, GameAnim } from './GameAnims';
+import { Colors, Colors3 } from '../../styles/colors';
+import { color3, float2, float3, float4, mat4x4, quat4, Utils3, ZAxis } from "../../utils/threeUtils";
+import { BatchedInstance } from './BatchedInstance';
+import { degToRad } from 'three/src/math/MathUtils.js';
 
 class RenderAssets {
 	public texPalette: THREE.Texture | undefined;
@@ -49,7 +51,7 @@ class RenderAssets {
 		this.model_House1 = addGeom(this, 'house.001');
 		this.model_House2 = addGeom(this, 'house.005');
 		this.model_House3 = addGeom(this, 'house.006');
-		
+
 		this.model_RoadStone = addGeom(this, 'road_stone');
 		this.model_Fountain = addGeom(this, 'fountain');
 
@@ -147,7 +149,6 @@ export class GameRenderer {
 			// color: 0xFFFFFF, // tint
 			roughness: 0.8,
 			metalness: 0.01,
-			side: THREE.DoubleSide,
 		});
 		this.assets.matDefault.onBeforeCompile = (shader) => {
 			// Add varying: vInstanceColor
@@ -204,7 +205,7 @@ gl_Position = projectionMatrix * mvPosition;
 			// Add varying vInstanceColor to vertex shader
 			shader.fragmentShader = shader.fragmentShader.replace(
 				'#include <color_fragment>',
-				/*glsl*/`
+				`
 const float InstUVSizeX = 1.0 / 16.0;
 const float InstUVSizeY = 15.0 / 16.0; // note the y-axis is flipped
 if (vUv.x < InstUVSizeX && vUv.y > InstUVSizeY) {
@@ -243,8 +244,10 @@ else
 	//#region Icon Rendering
 
 	private icons = {
-		XOffset: 1000,
+		XOffset: -1000,
 		FullRenderSize: 1024,
+		IconRenderSize: 128,
+		IconCount: 8,
 
 		canvas: null! as HTMLCanvasElement,
 		ctx: null as CanvasRenderingContext2D | null,
@@ -255,7 +258,10 @@ else
 		renderTarget: null! as THREE.WebGLRenderTarget,
 		scene: null! as THREE.Scene,
 		camera: null! as THREE.Camera,
-		iconModels: [] as BatchedInstance[],
+		icons: [] as ModelIcon[],
+		freeIcons: [] as P2[],
+		modelIcon: null! as BatchedInstance,
+		loadingIcon: null! as ModelIcon,
 
 		pixelBuffer: null! as Uint8Array,
 		imageData: null! as ImageData,
@@ -265,14 +271,15 @@ else
 
 	private async setupIconRendering() {
 		const size = this.icons.FullRenderSize;
+		const iconSize = this.icons.IconRenderSize;
 
 		// Create the canvas
 		const canvas = this.icons.canvas = document.createElement('canvas');
 		canvas.width = size;
 		canvas.height = size;
 		this.icons.tmpCanvas = document.createElement('canvas');
-		this.icons.tmpCanvas.width = size;
-		this.icons.tmpCanvas.height = size;
+		this.icons.tmpCanvas.width = iconSize;
+		this.icons.tmpCanvas.height = iconSize;
 
 		// Create the context
 		const ctx = this.icons.ctx = canvas.getContext('2d', { alpha: true });
@@ -285,64 +292,47 @@ else
 
 		// Preallocate an image from the context
 		// The render target will be copied to this image each frame
-		this.icons.pixelBuffer = new Uint8Array(1024 * 1024 * 4);
-		this.icons.imageData = ctx.createImageData(size, size);
+		this.icons.pixelBuffer = new Uint8Array(iconSize * iconSize * 4);
+		this.icons.imageData = ctx.createImageData(iconSize, iconSize);
 
 		// Create the render target
-		const renderTarget = this.icons.renderTarget = new THREE.WebGLRenderTarget(size, size, {
+		const renderTarget = this.icons.renderTarget = new THREE.WebGLRenderTarget(iconSize, iconSize, {
 			format: THREE.RGBAFormat,
 			type: THREE.UnsignedByteType,
 			minFilter: THREE.LinearFilter,
 			magFilter: THREE.LinearFilter,
+			colorSpace: THREE.SRGBColorSpace,
 		});
 
 		// Camera
-		const camera = this.icons.camera = new THREE.PerspectiveCamera(10, 1 / 1, 0.1, 100);
+		const camera = this.icons.camera = new THREE.PerspectiveCamera(45, 1 / 1, 0.1, 100);
 		const offsetX = this.icons.XOffset;
-		const centerX = offsetX + 3.5;
-		const centerY = 3.5;
-		camera.position.set(centerX, centerY, 47);
-		camera.lookAt(centerX, centerY, 0);
+		const centerX = offsetX;
+		const centerY = 0;
+		camera.position.set(centerX, centerY - 1, 1);
+		camera.lookAt(centerX, centerY, 0.25);
 
-		// Lighting
-		{
-			const iconSun = new THREE.PointLight(0xFFFFFF, 100, 100, 1);
-			iconSun.position.set(centerX, centerY - 10, 20);
-			iconSun.castShadow = false;
-			this.scene.add(iconSun);
+		// Create the icon model
+		this.icons.modelIcon = this.addModel(
+			this.assets.model_Missing,
+			new float3(centerX, centerY, 0),
+			1,
+			Colors3.white);
+
+		// Create the icon reserve
+		this.icons.freeIcons.length = 0;
+		for (let y = 0; y < 8; ++y) {
+			for (let x = 0; x < 8; ++x) {
+				this.icons.freeIcons.push(new P2(x, y));
+			}
 		}
 
-		// Add temp objects to test icon rendering
-		let nextIndex = 0;
-		addIconModel(this, this.assets.model_House1, Colors3.tileHouse1);
-		addIconModel(this, this.assets.model_House2, Colors3.tileHouse2);
-		addIconModel(this, this.assets.model_House3, Colors3.tileHouse3);
-		addIconModel(this, this.assets.model_Tree1, Colors3.tileTree1);
-		addIconModel(this, this.assets.model_Tree2, Colors3.tileTree2);
-		addIconModel(this, this.assets.model_RoadStone, Colors3.tileRoad1);
-		addIconModel(this, this.assets.model_Fountain, Colors3.tileRoad1);
-
-		function addIconModel(self: GameRenderer, modelID: number, color: color3) {
-			const index = nextIndex++;
-
-			let x = index % 8;
-			let y = Math.floor(index / 8);
-
-			self.icons.iconModels.push(
-				self.addModel(
-					modelID,
-					new float3(offsetX + x, y, 0),
-					0.5,
-					color)
-			);
-		}
+		this.icons.loadingIcon = this.addModelIcon(this.assets.model_Missing, Colors3.white);
 	}
 
 	private updateIcons(frame: Frame) {
-		const rot = Utils3.rotZRad(frame.time * 0.001);
-		for (const model of this.icons.iconModels) {
-			model.rotation.copy(rot);
-			model.updateMatrix();
+		for (const icon of this.icons.icons) {
+			icon.updateIcon = true;
 		}
 	}
 
@@ -353,43 +343,77 @@ else
 
 		this.updateIcons(frame);
 
+		const iconSize = icons.IconRenderSize;
+		const iconRenderCount = icons.IconCount;
+
 		// Render to the offscreen target
 		draw.setRenderTarget(icons.renderTarget);
-
-		// Clear
 		const prevBack = this.scene.background;
 		this.scene.background = null;
-		draw.setClearColor(0x000000, 0);
-		draw.clear(true, true, true);
 
-		// Render
-		icons.camera.updateMatrix();
-		draw.render(this.scene, icons.camera);
+		for (const icon of this.icons.icons) {
+			if (!icon.updateIcon) continue;
+			icon.updateIcon = false;
+
+			const iconCanvasX = this.icons.FullRenderSize * (icon.iconPos.x / iconRenderCount);
+			const iconCanvasY = this.icons.FullRenderSize * (icon.iconPos.y / iconRenderCount);
+
+			// Update model
+			icons.modelIcon.setMesh(icon.modelID);
+			icons.modelIcon.setColor(icon.color);
+			icons.modelIcon.rotation.setFromAxisAngle(ZAxis, degToRad(icon.iconInfo?.baseDegZ ?? 0));
+			icons.modelIcon.scale.setScalar(icon.iconInfo?.baseSize ?? 1);
+			icons.modelIcon.updateMatrix();
+			icons.modelIcon.setVisible(true);
+
+			// Clear
+			draw.setClearColor(0x000000, 0);
+			draw.clear(true, true, true);
+
+			// Render
+			icons.camera.updateMatrix();
+			draw.render(this.scene, icons.camera);
+
+			// Read the render target into a temp pixel buffer
+			draw.readRenderTargetPixels(icons.renderTarget, 0, 0, iconSize, iconSize, icons.pixelBuffer);
+
+			// Draw the imageData to the temp canvas
+			icons.imageData.data.set(icons.pixelBuffer);
+			icons.tmpCtx!.putImageData(icons.imageData, 0, 0);
+
+			// Draw the temp canvas to the canvas (flipping the y-axis)
+			const ctx = icons.ctx;
+			ctx.clearRect(iconCanvasX, iconCanvasY, iconSize, iconSize);
+			ctx.save();
+			ctx.translate(iconCanvasX, iconCanvasY + iconSize);
+			ctx.scale(1, -1);
+			ctx.drawImage(icons.tmpCanvas, 0, 0);
+			ctx.restore();
+		}
 
 		// Restore render
 		draw.setRenderTarget(null); // Reset back to main canvas/screen
 		this.scene.background = prevBack;
-
-		// Read the render target into a temp pixel buffer
-		const size = icons.FullRenderSize;
-		draw.readRenderTargetPixels(icons.renderTarget, 0, 0, size, size, icons.pixelBuffer);
-
-		// Draw the imageData to the temp canvas
-		icons.imageData.data.set(icons.pixelBuffer);
-		icons.tmpCtx!.putImageData(icons.imageData, 0, 0);
-
-		// Draw the temp canvas to the canvas (flipping the y-axis)
-		const ctx = icons.ctx;
-		ctx.clearRect(0, 0, size, size);
-		ctx.save();
-		ctx.scale(1, -1);
-		ctx.translate(0, -size);
-		ctx.drawImage(icons.tmpCanvas, 0, 0);
-		ctx.restore();
+		icons.modelIcon.setVisible(false);
 
 		// Convert the canvas into a data URL
 		const dataUrl = icons.canvas.toDataURL('image/png');
-		this.icons.styleTag.textContent = `:root { --img-game-icons: url(${dataUrl}); }`;
+		this.icons.styleTag.textContent = `:root { --img-game-icons: url(${dataUrl}); --img-game-icons-full-scale: ${iconRenderCount * 100}%; }`;
+	}
+
+	public addModelIcon(modelID: number, color: color3, iconInfo: IconInfo | undefined = undefined) {
+		if (this.icons.freeIcons.length < 1)
+			return this.icons.loadingIcon; // no more free icons
+
+		const iconPos = this.icons.freeIcons.pop()!;
+		const icon = new ModelIcon(iconPos, modelID, color, iconInfo);
+		this.icons.icons.push(icon);
+
+		return icon;
+	}
+
+	public freeIcon(icon: ModelIcon) {
+		this.icons.freeIcons.push(icon.iconPos);
 	}
 
 	//#endregion Icon Rendering
@@ -399,6 +423,8 @@ else
 	private gridSize: number = 0;
 	private hoverSelectorModel!: BatchedInstance;
 	private hoverPreviewModel!: BatchedInstance;
+
+	private ambientLight!: THREE.AmbientLight;
 
 	public async setupForGame(game: GameState) {
 		this.game = game;
@@ -415,15 +441,17 @@ else
 
 		// Lighting
 		{
-			this.scene.add(new THREE.AmbientLight(0xFFFFFF, 2));
+			this.ambientLight = new THREE.AmbientLight(0xFFFFFF, 2);
+			this.scene.add(this.ambientLight);
 
 			const sun = new THREE.DirectionalLight(0xefcdc7, 2);
 			sun.castShadow = true;
 			sun.position.set(10, 20, 20);
+			sun.target.position.set(0, 0, 0);
 			sun.shadow.mapSize.width = 2048;
 			sun.shadow.mapSize.height = 2048;
-			sun.shadow.bias = -0.00001;
-			sun.shadow.camera.near = 0.1;
+			sun.shadow.bias = -0.0001;
+			sun.shadow.camera.near = 1;
 			sun.shadow.camera.far = 100;
 			sun.shadow.camera.left = -10;
 			sun.shadow.camera.right = 10;
@@ -438,29 +466,19 @@ else
 		}
 
 		// Grid
-		const mat = new THREE.MeshStandardMaterial({
-			color: 0xFFFFFF,
-			roughness: 0.5,
-			metalness: 0.1,
-		});
 		{
-			const matrix = new mat4x4();
-			const position = new float3();
+			// Initialize tile backgrounds
 			for (let y = 0; y < this.gridSize; ++y) {
 				for (let x = 0; x < this.gridSize; ++x) {
-					// Initialize the tile
-					const tile = game.grid.getTile(x + 1, y + 1);
-					const tileInst = this.drawBatch.addInstance(this.assets.model_TileBG);
+					const tile = game.grid.get(x + 1, y + 1);
+					tile.tileBGInst = this.addModel(
+						this.assets.model_TileBG,
+						new float3(tile.pos.x, tile.pos.y, -0.01),
+						1,
+						Tile.getTileBaseColor(tile.pos)
+					);
 
-					const rng = this.game.rng.slice(y * this.gridSize * 13 + x * 7);
-					tile.draw = new TileDraw(x, y, tileInst, rng);
-					position.copy(tile.draw.centerPos);
-					position.z = -0.01;
-					matrix.makeTranslation(position);
-
-					this.drawBatch.setMatrixAt(tileInst, matrix);
-					this.drawBatch.setColorAt(tileInst, tile.draw.baseColor);
-
+					tile.shouldDraw = true;
 				}
 			}
 		}
@@ -493,7 +511,7 @@ else
 		if (!this.hoverSelectorModel)
 			return;
 
-		if (!tile?.draw) {
+		if (!tile || !tile.shouldDraw) {
 			this.hoverSelectorModel.setVisible(false);
 			this.hoverPreviewModel?.setVisible(false);
 			return;
@@ -613,12 +631,13 @@ else
 		modelID: number,
 		pos: float3,
 		size: number,
-		color: color3) {
+		color: color3,
+		collection: ModelCollection | null = null) {
 		const rotation = new quat4();
 		const scale = new float3(size, size, size);
 		const matrix = new mat4x4()
 			.compose(pos, rotation, scale);
-		return this.addModel_Mat(modelID, pos, rotation, scale, matrix, color);
+		return this.addModel_Mat(modelID, pos, rotation, scale, matrix, color, collection);
 	}
 
 	public addModel_Mat(
@@ -627,76 +646,13 @@ else
 		rotation: quat4,
 		scale: float3,
 		matrix: mat4x4,
-		color: color3) {
+		color: color3,
+		collection: ModelCollection | null = null) {
 		const inst = this.drawBatch.addInstance(modelID);
 		this.drawBatch.setMatrixAt(inst, matrix);
 		this.drawBatch.setColorAt(inst, color);
-		return new BatchedInstance(this.drawBatch, inst, pos, rotation, scale);
-	}
-
-	public addMeshToTile(
-		modelID: number,
-		tile: Tile,
-		pos: float3,
-		color: color3,
-	) {
-		const position = pos;
-		const scale = 0;
-		const model = this.addModel(modelID,
-			position,
-			scale,
-			color);
-
-		tile.draw?.models.push(model);
-		return model;
-	}
-
-	public growMeshOnTile(
-		modelID: number,
-		tile: Tile,
-		color: color3,
-		duration: number,
-		pos: float3,
-		size: number,
-	): BatchedInstance;
-	public growMeshOnTile(
-		modelID: number,
-		tile: Tile,
-		color: color3,
-		duration: number,
-		pos: float3,
-		scale: float3,
-		rot: quat4,
-	): BatchedInstance;
-	public growMeshOnTile(
-		modelID: number,
-		tile: Tile,
-		color: color3,
-		duration: number,
-		pos: float3,
-		scale: number | float3,
-		rot?: quat4,
-	): BatchedInstance {
-		// Create initial model
-		const model = this.addModel(modelID,
-			new float3(tile.pos.x, tile.pos.y, 0),
-			0,
-			color);
-		tile.draw?.models.push(model);
-
-		// Animate to target transform
-		if (rot !== undefined) {
-			// Extract target transform
-			this.game!.addAnim(Anims.growModelTRS(
-				model, pos, rot, scale as float3, duration
-			));
-		}
-		else {
-			this.game?.addAnim(Anims.growModel(
-				model, scale as number, duration
-			));
-		}
-
+		const model = new BatchedInstance(this.drawBatch, inst, pos, rotation, scale);
+		collection?.addModel(model);
 		return model;
 	}
 
@@ -724,88 +680,17 @@ else
 	}
 }
 
-export class BatchedInstance {
-	private static _nextID = 0;
-	public debugId: number = BatchedInstance._nextID++;
-	private static _matrix = new mat4x4();
+export class ModelIcon {
+	public iconPos: P2;
+	public modelID: number;
+	public color: color3;
+	public iconInfo: IconInfo | undefined;
+	public updateIcon: boolean = true;
 
-	constructor(
-		public batch: BatchedMesh,
-		public instId: number,
-		public position = new float3(),
-		public rotation = new quat4(),
-		public scale = new float3(1, 1, 1)) {
-	}
-
-	public name: string | undefined;
-	setName(name: string): BatchedInstance {
-		this.name = name;
-		return this;
-	}
-
-	setMesh(meshId: number) {
-		this.batch.setGeometryIdAt(this.instId, meshId);
-		return this;
-	}
-
-	setMatrix(matrix: mat4x4) {
-		this.batch.setMatrixAt(this.instId, matrix);
-		return this;
-	}
-
-	setPosition(x: number, y: number);
-	setPosition(x: number, y: number, z: number);
-	setPosition(x: number, y: number, z?: number) {
-		this.position.set(x, y, z ?? 0);
-		return this.updateMatrix();
-	}
-
-	setRotation(rotRad: number) {
-		this.rotation.setFromAxisAngle(new float3(0, 0, 1), rotRad);
-		return this.updateMatrix();
-	}
-
-	setScale(x: number);
-	setScale(x: number, y: number, z: number);
-	setScale(x: number, y?: number, z?: number) {
-		this.scale.set(x, y ?? x, z ?? x);
-		return this.updateMatrix();
-	}
-
-	setTRS(
-		pos: float3,
-		rotRad: number,
-		scale: float3
-	) {
-		this.position.copy(pos);
-		this.rotation.setFromAxisAngle(new float3(0, 0, 1), rotRad);
-		this.scale.copy(scale);
-		return this.updateMatrix();
-	}
-
-	updateMatrix() {
-		BatchedInstance._matrix.compose(this.position, this.rotation, this.scale);
-		this.batch.setMatrixAt(this.instId, BatchedInstance._matrix);
-		return this;
-	}
-
-	setColor(color: color3) {
-		this.batch.setColorAt(this.instId, color);
-		return this;
-	}
-
-	getMatrix(target = new mat4x4()) {
-		return this.batch.getMatrixAt(this.instId, target);
-	}
-
-	setVisible(visible: boolean) {
-		this.batch.setVisibleAt(this.instId, visible);
-		return this;
-	}
-
-	destroy() {
-		this.batch.deleteInstance(this.instId);
-		this.instId = -1;
+	constructor(iconPos: P2, modelID: number, color: color3, iconInfo: IconInfo | undefined) {
+		this.iconPos = iconPos;
+		this.modelID = modelID;
+		this.color = color;
+		this.iconInfo = iconInfo;
 	}
 }
-

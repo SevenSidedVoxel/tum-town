@@ -3,7 +3,7 @@ import { P2 } from "../game/P2";
 import { Frame } from "../game/Frame";
 import { GameAnim } from "../game/GameAnims";
 import { CTX, GameState } from "../game/GameState";
-import { GameRenderer } from "../game/render/GameRenderer";
+import { dev_ShouldAddVisualDevModels, GameRenderer } from "../game/render/GameRenderer";
 import { Tile, TileType } from "../game/Tile";
 
 export const BuildTimestamp = __BUILD_TIMESTAMP__;
@@ -78,6 +78,15 @@ export class GameView implements IView {
 		// Setup Game State
 		this.game.setupGame();
 		this.selectNextItem();
+
+		// Dev: Add Design Models
+		if (dev_ShouldAddVisualDevModels) {
+			let ctx = new CTX(this.game);
+			ctx.addVisualDevModels();
+			ctx.finalize();
+
+			this.playNextAnim();
+		}
 
 		// Connect Game Listeners
 		this.game.score.updateVisuals();
@@ -202,7 +211,7 @@ export class GameView implements IView {
 
 		this.nextItemButton.textContent = `${this.selectedItem?.name ?? 'None'}`;
 
-		let itemsHtml = "";
+		let itemsHtml = /*html*/`<div class="game-act-icons">`;
 
 		const iconCount = 8 - 1;
 		for (let i = 0; i < this.game.items.length; ++i) {
@@ -213,11 +222,11 @@ export class GameView implements IView {
 
 			const selectedClass = item.type == this.selectedItem ? " game-act-icon-selected" : "";
 			itemsHtml += /*html*/`
-<div class="game-act-icons">
 	<div id="gameAct_${i}" class="game-act-icon${selectedClass}" style="--icon-x-pos: ${imgPosX}%; --icon-y-pos: ${imgPosY}%;"></div>
-</div>
 `;
 		}
+
+		itemsHtml +=/*html*/`</div>`;
 		this.gameActionsOptsElem.innerHTML = itemsHtml;
 
 		for (let i = 0; i < this.game.items.length; ++i) {

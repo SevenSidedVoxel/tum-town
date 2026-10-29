@@ -234,6 +234,36 @@ export class CTX {
 	public addNat(tile: Tile, n: number) { return this.game.addNat(tile, n); }
 
 	//#endregion GameState Access
+
+	public addVisualDevModels() {
+		// Dev: Add various models for visual development
+		console.warn("Adding Visual Dev Models");
+		this.startCombinedAnim();
+
+		addRotations(this, 1, 8, Tiles.House2);
+		addRotations(this, 5, 8, Tiles.House3);
+
+		addRotations(this, 1, 7, Tiles.Factory1);
+		addRotations(this, 5, 7, Tiles.Sawmill);
+
+		addRotations(this, 1, 6, Tiles.House1);
+
+		addRotations(this, 1, 5, Tiles.Tree);
+		addRotations(this, 5, 5, Tiles.Forest);
+
+		addRotations(this, 1, 4, Tiles.Path);
+		addRotations(this, 5, 4, Tiles.Fountain);
+
+		this.regenVisuals();
+		this.endAndAddCombinedAnim();
+
+		function addRotations(self, xStart, y, tileType) {
+			self.replaceTile(self.game.grid.get(xStart++, y), tileType, 0);
+			self.replaceTile(self.game.grid.get(xStart++, y), tileType, 90);
+			self.replaceTile(self.game.grid.get(xStart++, y), tileType, 180);
+			self.replaceTile(self.game.grid.get(xStart++, y), tileType, 270);
+		}
+	}
 }
 
 export class GameState {

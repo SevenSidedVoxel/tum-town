@@ -8,6 +8,7 @@ import { GameState, CTX as CTX } from "./GameState";
 import { Tiles } from "./_tiles_";
 import { ModelCollection } from "./ModelCollection";
 import { Pathing } from "./PathSystem";
+import { RenderAssets } from "./render/GameRenderer";
 
 export class Tile {
 	// State
@@ -43,7 +44,7 @@ export class Tile {
 		this.actIndex = 0;
 	}
 
-	public rng(ctx: CTX) { return ctx.game.rng.slice(this.rngSeed); }
+	public rng(ctx: CTX): RandomSlice { return ctx.game.rng.slice(this.rngSeed); }
 
 	public regenTile(ctx: CTX) { ctx.addAnim(this.regenTile_anim(ctx)); }
 	public regenTile_anim(ctx: CTX) {
@@ -157,7 +158,7 @@ export type TileType = {
 
 	// Visuals
 	color?: color3;
-	model?: string;
+	model?: (assets: RenderAssets) => number;
 	centerVariance?: number;
 	regen?: (ctx: CTX, tile: Tile) => void;
 };

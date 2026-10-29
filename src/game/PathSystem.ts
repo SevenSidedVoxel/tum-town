@@ -8,6 +8,7 @@ import { Grid } from "./Grid";
 import { P2 } from "./P2";
 import { Tile } from "./Tile";
 import { ModelCollection } from "./ModelCollection";
+import { Z_PathDepth } from "./render/GameRenderer";
 
 class Path {
 	public pA: P2;
@@ -460,8 +461,9 @@ export class PathSystem {
 		ctx: CTX,
 		tile: Tile,
 		path: Path) {
-		const start = path.startPos;
-		const end = path.endPos;
+		const zLevel = Z_PathDepth;
+		const start = path.startPos.clone().setZ(zLevel);
+		const end = path.endPos.clone().setZ(zLevel);
 		const dir = new float3().subVectors(end, start);
 		const len = dir.length();
 		const para = dir.clone().divideScalar(len);
@@ -478,7 +480,7 @@ export class PathSystem {
 		const spacing = len / count;
 		for (let i = 1; i < count; ++i) {
 			const size = rng.nextF(0.4, 0.5);
-			pathPositions.push([new float3()
+			pathPositions.push([new float3(0, 0, 0)
 				.addScaledVector(para, i * spacing)
 				.addScaledVector(perp, (i % 2 ? -1 : +1) * 0.025)
 				.add(start),

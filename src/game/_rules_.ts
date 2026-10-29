@@ -60,26 +60,6 @@ export function makeRules(): Rule[] {
 		},
 		MatchFlags.None));
 
-	rules.push(new Rule("Make Forest X",
-		{
-			c: Tiles.Tree,
-			ul: Tiles.Tree,
-			ur: Tiles.Tree,
-			dl: Tiles.Tree,
-			dr: Tiles.Tree,
-		},
-		(ctx, area, rot) => {
-			// Choose the newest tile to become the forest
-			ctx.mergeTilesInto(
-				area.c,
-				[area.ul, area.ur, area.dl, area.dr],
-				Tiles.Forest
-			);
-
-			ctx.addScore(area.c, 4);
-			ctx.addNat(area.c, 2);
-		},
-		MatchFlags.None));
 	rules.push(new Rule("Make Forest",
 		{
 			c: Tiles.Tree,

@@ -17,7 +17,12 @@ import { color3, float2, float3, float4, mat4x4, quat4, Utils3, ZAxis } from "..
 import { BatchedInstance } from './BatchedInstance';
 import { degToRad } from 'three/src/math/MathUtils.js';
 
-class RenderAssets {
+export const dev_ShouldAddVisualDevModels = false;
+
+export const Z_PathDepth = -0.01;
+export const Z_TileBG = -0.02;
+
+export class RenderAssets {
 	public texPalette: THREE.Texture | undefined;
 
 	public matDefault: THREE.Material | undefined;
@@ -36,12 +41,14 @@ class RenderAssets {
 	public model_LineSeg!: number;
 	public model_LineCap!: number;
 
+	public model_PathGround_Small!: number;
+	public model_PathGround_Large!: number;
+
 	public model_RoadStone!: number;
 	public model_Fountain!: number;
 
 	public model_Tree1!: number;
 	public model_SingleTrees!: number[];
-	public model_Tree2!: number;
 
 	loadModels(gltf: GLTF, batch: BatchedMesh) {
 		this.model_Missing = batch.addGeometry(new THREE.BoxGeometry(0.5, 0.5, 0.5));
@@ -58,14 +65,18 @@ class RenderAssets {
 		this.model_Sawmill = addGeom(this, 'sawmill');
 
 		this.model_RoadStone = addGeom(this, 'road_stone');
+		this.model_PathGround_Small = addGeom(this, 'ground_s');
+		this.model_PathGround_Large = addGeom(this, 'ground_l');
+
 		this.model_Fountain = addGeom(this, 'fountain');
 
 		this.model_SingleTrees = [
 			addGeom(this, 'tree.001'),
-			addGeom(this, 'tree.003'),
+			addGeom(this, 'tree.002'),
+			// addGeom(this, 'tree.003'),
 		];
 		this.model_Tree1 = this.model_SingleTrees[0]!;
-		this.model_Tree2 = addGeom(this, 'tree.002');
+		this.model_SingleTrees.push(this.model_Tree1); // make Tree1 more likely
 
 		function addGeom(self: RenderAssets, name: string) {
 			let geom = gltf.scene.getGeometryByName(name);
@@ -77,9 +88,9 @@ class RenderAssets {
 		}
 	}
 
-	public getModel(model: string | undefined): number {
+	public getModel(model: ((assets: RenderAssets) => number) | undefined): number {
 		if (!model) return this.model_Missing;
-		return this[model] ?? this.model_Missing;
+		return model(this) ?? this.model_Missing;
 	}
 }
 
@@ -166,6 +177,8 @@ export class GameRenderer {
 			const varyings = /*glsl*/`
 varying vec3 vInstanceColor;
 varying vec2 vUv;
+varying float vWorldPositionZ;
+varying float vShouldDepthShade;
 `;
 			shader.vertexShader = varyings + shader.vertexShader;
 			shader.fragmentShader = varyings + shader.fragmentShader;
@@ -198,14 +211,16 @@ mvPosition.xy *= (vec2(1, 1) + 1.25 * mvPosition.z);
 
 // Apply instancing transforms
 #ifdef USE_BATCHING
-	mvPosition = batchingMatrix * mvPosition;
+mvPosition = batchingMatrix * mvPosition;
+vShouldDepthShade = batchingMatrix[3][2] >= 0.0 ? 1.0 : 0.0; // This line here?
 #endif
 #ifdef USE_INSTANCING
-	mvPosition = instanceMatrix * mvPosition;
+mvPosition = instanceMatrix * mvPosition;
 #endif
 
 mvPosition = modelMatrix * mvPosition;
-mvPosition.y += 0.6 * mvPosition.z;
+mvPosition.y += 0.5 * mvPosition.z;
+vWorldPositionZ = mvPosition.z;
 
 mvPosition = viewMatrix * mvPosition;
 
@@ -228,6 +243,13 @@ else
 	// get default coloring
 	vec4 sampledDiffuseColor = texture2D(map, vUv);
 	diffuseColor = sampledDiffuseColor;
+}
+
+// Darken color near ground
+if(vShouldDepthShade > 0.0)
+{
+	float darken01 = clamp(0.6 + 2.0 * vWorldPositionZ, 0.0, 1.0);
+	diffuseColor.rgb *= darken01;
 }
 `
 			);
@@ -341,11 +363,7 @@ else
 		this.icons.loadingIcon = this.addModelIcon(this.assets.model_Missing, Colors3.white);
 	}
 
-	private updateIcons(frame: Frame) {
-		for (const icon of this.icons.icons) {
-			icon.updateIcon = true;
-		}
-	}
+	private updateIcons(frame: Frame) { }
 
 	private drawIcons(frame: Frame) {
 		const draw = this.renderer;
@@ -461,13 +479,14 @@ else
 			sun.target.position.set(0, 0, 0);
 			sun.shadow.mapSize.width = 2048;
 			sun.shadow.mapSize.height = 2048;
-			sun.shadow.bias = -0.0001;
+			sun.shadow.bias = 0.00013;
 			sun.shadow.camera.near = 1;
 			sun.shadow.camera.far = 100;
 			sun.shadow.camera.left = -10;
 			sun.shadow.camera.right = 10;
 			sun.shadow.camera.top = 10;
 			sun.shadow.camera.bottom = -10;
+			sun.shadow.radius = 2;
 
 			// enable shadows
 			this.renderer.shadowMap.enabled = true;
@@ -484,7 +503,7 @@ else
 					const tile = game.grid.get(x + 1, y + 1);
 					tile.tileBGInst = this.addModel(
 						this.assets.model_TileBG,
-						new float3(tile.pos.x, tile.pos.y, -0.01),
+						new float3(tile.pos.x, tile.pos.y, Z_TileBG),
 						1,
 						Tile.getTileBaseColor(tile.pos)
 					);

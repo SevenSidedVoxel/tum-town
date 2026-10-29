@@ -1,8 +1,11 @@
 import { Colors3 } from "../styles/colors";
 import { color3, float3, quat4, Utils3 } from "../utils/threeUtils";
 import { Anims } from "./GameAnims";
+import { CTX } from "./GameState";
 import { P2 } from "./P2";
 import { Pathing } from "./PathSystem";
+import { RenderAssets, Z_PathDepth } from "./render/GameRenderer";
+import { RandomSlice } from "./SeededRandom";
 import { Tile, TileType } from "./Tile";
 
 export const Tiles = {
@@ -17,9 +20,9 @@ export const Tiles = {
 
 	House1: {
 		name: "house",
-		model: "model_House1",
+		model: a => a.model_House1,
 		icon: {
-			baseSize: 0.7,
+			baseSize: 1.6,
 			baseDegZ: 5,
 		},
 		color: Colors3.tileHouse1,
@@ -37,7 +40,7 @@ export const Tiles = {
 				// Add model
 				const rng = tile.rng(ctx);
 				const centerPos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
-				const size = rng.nextF(0.5, 0.6);
+				const size = rng.nextF(1, 1.2);
 				const zDeg = rng.nextDegSnapped(30);
 
 				ctx.growMeshOnTile(
@@ -52,15 +55,43 @@ export const Tiles = {
 			}
 		},
 	},
-	House2: makeSimpleBuilding("house2", "model_House2", { scale: 0.8, color: Colors3.tileHouse2 }),
-	House3: makeSimpleBuilding("house3", "model_House3", { scale: 0.8, color: Colors3.tileHouse3 }),
+	House2: makeSimpleBuilding("house2", a => a.model_House2, { scale: 0.8, color: Colors3.tileHouse2 }),
+	House3: makeSimpleBuilding("house3", a => a.model_House3, { scale: 0.8, color: Colors3.tileHouse3 }),
 
-	Factory1: makeSimpleBuilding("building", "model_Factory1", { scale: 0.8, color: Colors3.tileHouse2 }),
-	Sawmill: makeSimpleBuilding("sawmill", "model_Sawmill", { scale: 0.8, rot: -10, color: Colors3.tileHouse2 }),
+	Factory1: makeSimpleBuilding("building", a => a.model_Factory1, { scale: 0.8, color: Colors3.tileHouse2 }),
+	Sawmill: {
+		name: "sawmill",
+		model: a => a.model_Sawmill,
+		color: Colors3.tileHouse2,
+		pathing: Pathing.ConnectAny_Adj4(),
+		interact(ctx, tile) {
+			ctx.paths.rotatePath_Adj4(ctx, tile);
+		},
+		regen(ctx, tile) {
+			if (tile.firstTimeBuild()) {
+				// Add model
+				const rng = tile.rng(ctx);
+				const centerPos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
+				const size = 1;
+				const zDeg = tile.rot ?? 0;
+
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					ctx.assets.getModel(this.model),
+					new color3(this.color),
+					centerPos,
+					new float3(size, size, size),
+					Utils3.rotZDeg(zDeg),
+				);
+				addGroundPath(ctx, tile, rng, "large");
+			}
+		},
+	},
 
 	Path: {
 		name: "path",
-		model: "model_LineCap",
+		model: a => a.model_LineCap,
 		color: Colors3.tileRoad1,
 		centerVariance: 0,
 		pathing: Pathing.ConnectAll_Adj8(),
@@ -81,7 +112,7 @@ export const Tiles = {
 					tile,
 					ctx.assets.getModel(this.model),
 					new color3(this.color),
-					pos,
+					pos.setZ(Z_PathDepth),
 					new float3(size, size, size),
 					Utils3.rotZDeg(zDeg),
 				);
@@ -90,7 +121,7 @@ export const Tiles = {
 	},
 	Fountain: {
 		name: "fountain",
-		model: "model_Fountain",
+		model: a => a.model_Fountain,
 		color: Colors3.tileRoad1,
 		centerVariance: 0,
 		pathing: Pathing.ConnectAll_Adj4()
@@ -107,15 +138,17 @@ export const Tiles = {
 					new color3(this.color),
 					pos,
 				);
+				addGroundPath(ctx, tile, rng, "large");
 			}
 		},
 	},
 
 	Tree: {
 		name: "tree",
-		model: "model_Tree1",
+		model: a => a.model_Tree1,
 		icon: {
 			baseDegZ: -60,
+			baseSize: 0.6,
 		},
 		color: Colors3.tileTree1,
 		centerVariance: 0.1,
@@ -193,7 +226,7 @@ export const Tiles = {
 
 	Forest: {
 		name: "forest",
-		model: "model_Tree2",
+		model: a => a.model_Tree1,
 		color: Colors3.tileTree1,
 		centerVariance: 0.05,
 		place(ctx, tile) {
@@ -205,14 +238,28 @@ export const Tiles = {
 				const rng = tile.rng(ctx);
 				const centerPos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
 
-				ctx.growMeshOnTile(
-					tile.models,
-					tile,
-					ctx.assets.getModel(this.model),
-					new color3(this.color),
-					centerPos,
-					new float3().setScalar(rng.nextF(0.9, 1)),
-				);
+				const positions = [
+					new P2(0.5, 0.5),
+					new P2(0.25, 0.25),
+					new P2(0.25, 0.75),
+					new P2(0.75, 0.25),
+					new P2(0.75, 0.75),
+				];
+				for (let pos of positions) {
+					const model = rng.choose(ctx.assets.model_SingleTrees);
+					const p = pos
+						.addXY(centerPos.x - 0.5, centerPos.y - 0.5)
+						.addXY(rng.nextF(-0.05, 0.05), rng.nextF(-0.05, 0.05));
+					ctx.growMeshOnTile(
+						tile.models,
+						tile,
+						model,
+						new color3(this.color),
+						new float3(p.x, p.y, 0),
+						new float3().setScalar(rng.nextF(0.7, 1)),
+						Utils3.rotZRad(rng.nextRadians()),
+					);
+				}
 			}
 		},
 	},
@@ -222,18 +269,20 @@ export const Tiles = {
 
 function makeSimpleBuilding(
 	name: string,
-	modelName: string,
+	model: (a: RenderAssets) => number,
 	draw: {
 		scale?: number,
 		rot?: number,
-		color?: color3
-	} = { }) {
+		color?: color3,
+		ground?: "small" | "large",
+	} = {}) {
 	const baseModelScale = draw?.scale ?? 1;
 	const baseModelRot = draw?.rot ?? 0;
 	const color = draw?.color ?? Colors3.tileHouse1;
+	const ground = draw?.ground;
 	return {
 		name: name,
-		model: modelName,
+		model: model,
 		color: color,
 		centerVariance: 0,
 		pathing: Pathing.ConnectAny_Adj4(),
@@ -243,6 +292,7 @@ function makeSimpleBuilding(
 		regen(ctx, tile) {
 			if (tile.firstTimeBuild()) {
 				// Add model
+				const rng = tile.rng(ctx);
 				const centerPos = Tile.calcVisualCenterPos(tile.pos);
 				const size = baseModelScale;
 				const zDeg = baseModelRot + (tile.rot ?? 0);
@@ -256,7 +306,22 @@ function makeSimpleBuilding(
 					new float3(size, size, size),
 					Utils3.rotZDeg(zDeg),
 				);
+
+				if (ground)
+					addGroundPath(ctx, tile, rng, ground);
 			}
 		},
 	};
+}
+
+function addGroundPath(ctx: CTX, tile: Tile, rng: RandomSlice, size: 'small' | 'large') {
+	ctx.growMeshOnTile(
+		tile.models,
+		tile,
+		size == 'small' ? ctx.assets.model_PathGround_Small : ctx.assets.model_PathGround_Large,
+		Colors3.tileRoad1,
+		new float3(tile.pos.x, tile.pos.y, Z_PathDepth),
+		new float3().setScalar(1),
+		Utils3.rotZRad(rng.nextRadians()),
+	);
 }

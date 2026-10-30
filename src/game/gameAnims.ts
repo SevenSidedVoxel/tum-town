@@ -1,5 +1,5 @@
 import { Colors3 } from "../styles/colors";
-import { float3, quat4 } from "../utils/threeUtils";
+import { color3, float3, quat4 } from "../utils/threeUtils";
 import { GameState } from "./GameState";
 import { clamp01, lerp, P2 } from "./P2";
 import { BatchedInstance } from "./render/BatchedInstance";
@@ -229,6 +229,28 @@ export namespace Anims {
 				model.position.copy(initPos);
 				model.position.lerp(targetPos, l);
 				model.updateMatrix();
+			},
+		});
+	}
+
+	export function changeColor(
+		model: BatchedInstance,
+		color: color3,
+		duration: number = Anims.BaseDur): GameAnim {
+		let initCol = new color3();
+		let col = new color3();
+		return new GameAnim({
+			name: changeColor.name,
+			duration: duration,
+			start: function () {
+				initCol.copy(model.color);
+			},
+			update: function (dt) {
+				const [t, s] = this.lil();
+				const l = Ease.popOut(t);
+				col.copy(initCol);
+				col.lerp(color, l);
+				model.setColor(col);
 			},
 		});
 	}

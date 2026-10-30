@@ -16,6 +16,7 @@ export const Tiles = {
 		canPlace(game, tile) { return true; },
 		regen(ctx, tile) {
 			ctx.addAnim(tile.destroyModels_anim(ctx));
+			ctx.addAnim(tile.setTileColor_anim(Tile.getTileBaseColor(tile.pos)));
 		}
 	},
 
@@ -44,6 +45,7 @@ export const Tiles = {
 				const size = rng.nextF(1, 1.2);
 				const zDeg = rng.nextDegSnapped(30);
 
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
 				ctx.growMeshOnTile(
 					tile.models,
 					tile,
@@ -76,6 +78,7 @@ export const Tiles = {
 				const size = 1;
 				const zDeg = tile.rot ?? 0;
 
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
 				ctx.growMeshOnTile(
 					tile.models,
 					tile,
@@ -108,6 +111,7 @@ export const Tiles = {
 				const size = rng.nextF(0.5, 0.5);
 				const zDeg = tile.rot ?? 0;
 
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
 				ctx.growMeshOnTile(
 					tile.models,
 					tile,
@@ -118,8 +122,6 @@ export const Tiles = {
 					Utils3.rotZDeg(zDeg),
 				);
 			}
-
-			// addGroundPath(ctx, tile, tile.rng(ctx), "small", Colors3.floorDirt);
 		}
 	},
 	Fountain: {
@@ -134,6 +136,7 @@ export const Tiles = {
 				const rng = tile.rng(ctx);
 				const pos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
 
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
 				ctx.growMeshOnTile(
 					tile.models,
 					tile,
@@ -164,20 +167,21 @@ export const Tiles = {
 
 			// Check for neighbouring trees and adjust the center to be near other trees
 			const adj = ctx.grid.getAdj8(tile.pos);
-			const center = new P2(0, 0);
-			let count = 0;
+			const treeCenter = new P2(0, 0);
+			const forestCenter = new P2(0, 0);
+			let treeCount = 0;
+			let forestCount = 0;
 			function addTileWeight(tile: Tile, x: number, y: number) {
-				let weight = 0;
-				if (tile.type == Tiles.Tree)
-					weight = 1;
-				if (tile.type == Tiles.Forest)
-					weight = 1.5;
+				let weight = Math.abs(x) == Math.abs(y) ? 1.25 : 1;
 
-				weight *= 2 / (1 + x * x + y * y);
-
-				if (weight == 0) return;
-				center.addXY(x * weight, y * weight);
-				count++;
+				if (tile.type == Tiles.Tree) {
+					treeCenter.addXY(x * weight, y * weight);
+					treeCount++;
+				}
+				else if (tile.type == Tiles.Forest) {
+					forestCenter.addXY(x * weight, y * weight);
+					forestCount++;
+				}
 			}
 			addTileWeight(adj.ul, -1, +1);
 			addTileWeight(adj.u, +0, +1);
@@ -187,14 +191,26 @@ export const Tiles = {
 			addTileWeight(adj.dl, -1, -1);
 			addTileWeight(adj.d, +0, -1);
 			addTileWeight(adj.dr, +1, -1);
-			if (count != 0) {
-				center.mulS(1.0 / count);
+			let center = new P2(0, 0);
+			if (forestCount > 0) {
+				center = forestCenter;
+				center.mulS(1.0 / forestCount);
+				center.mulXY(0.25, 0.25);
 				center.clampXY(
 					-1, 1,
 					-1, 1
 				);
-				center.mulXY(0.25, 0.25);
 			}
+			else if (treeCount > 0) {
+				center = treeCenter;
+				center.mulS(1.0 / treeCount);
+				center.mulXY(0.25, 0.25);
+				center.clampXY(
+					-1, 1,
+					-1, 1
+				);
+			}
+
 			const centerPos = new float3(center.x, center.y - 0.1, 0)
 				.add({ x: tile.pos.x, y: tile.pos.y, z: 0 });
 
@@ -206,6 +222,7 @@ export const Tiles = {
 			if (tile.firstTimeBuild()) {
 				// Grow the new model
 				const model = rng.choose(ctx.assets.model_SingleTrees);
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
 				ctx.growMeshOnTile(
 					tile.models,
 					tile,
@@ -215,8 +232,6 @@ export const Tiles = {
 					new float3().setScalar(rng.nextF(0.9, 1)),
 					Utils3.rotZRad(rng.nextRadians())
 				);
-
-				addGroundPath(ctx, tile, rng, "small", Colors3.floorForest);
 				return;
 			}
 			else {
@@ -243,6 +258,8 @@ export const Tiles = {
 				const rng = tile.rng(ctx);
 				const centerPos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
 
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
+
 				const positions = [
 					new P2(0.5, 0.5),
 					new P2(0.25, 0.25),
@@ -264,9 +281,7 @@ export const Tiles = {
 						new float3().setScalar(rng.nextF(0.7, 1)),
 						Utils3.rotZRad(rng.nextRadians()),
 					);
-				}
-
-				addGroundPath(ctx, tile, rng, "large", Colors3.floorForest);
+				}				
 			}
 		},
 	},
@@ -289,6 +304,7 @@ export const Tiles = {
 
 				// Destroy old models
 				ctx.destroyOldModels(tile.models);
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
 				ctx.growMesh({
 					collection: tile.models,
 					tile: tile,
@@ -327,6 +343,7 @@ export const Tiles = {
 
 				// Destroy old models
 				ctx.destroyOldModels(tile.models);
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
 
 				// Add water model
 				const waterModel = ctx.assets.model_WaterTiles[waterFill]!;
@@ -401,6 +418,7 @@ function makeSimpleBuilding(
 				const size = baseModelScale;
 				const zDeg = baseModelRot + (tile.rot ?? 0);
 
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
 				ctx.growMeshOnTile(
 					tile.models,
 					tile,

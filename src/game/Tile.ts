@@ -9,6 +9,7 @@ import { Tiles } from "./_tiles_";
 import { ModelCollection } from "./ModelCollection";
 import { Pathing } from "./PathSystem";
 import { RenderAssets } from "./render/GameRenderer";
+import { Color } from "three";
 
 export class Tile {
 	// State
@@ -97,6 +98,10 @@ export class Tile {
 	//#endregion Visuals
 
 	//#region Animations
+
+	public setTileColor_anim(color: Color, duration: number = Anims.BaseDur): GameAnim | undefined {
+		return Anims.changeColor(this.tileBGInst!, color, duration);
+	}
 
 	public destroyModels_anim(ctx: CTX, duration: number = Anims.BaseDur): GameAnim | undefined {
 		ctx.startCombinedAnim();

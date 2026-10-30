@@ -66,6 +66,7 @@ export class BatchedInstance {
 		return this;
 	}
 
+	public get color() { return this.batch.getColorAt(this.instId, new color3()); }
 	setColor(color: color3) {
 		this.batch.setColorAt(this.instId, color);
 		return this;

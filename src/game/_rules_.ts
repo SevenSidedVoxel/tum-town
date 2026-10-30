@@ -60,34 +60,12 @@ export function makeRules(): Rule[] {
 		},
 		MatchFlags.None));
 
-	rules.push(new Rule("Make Forest",
-		{
-			c: Tiles.Tree,
-			u: Tiles.Tree,
-			ul: Tiles.Tree,
-			l: Tiles.Tree,
-		},
-		(ctx, area, rot) => {
-			// Choose the newest tile to become the forest
-			const tiles = [area.c, area.u, area.ul, area.l];
-			const lastTile = pickLastActIndex(tiles);
-
-			ctx.mergeTilesInto(
-				lastTile,
-				tiles.filter(t => t !== lastTile),
-				Tiles.Forest
-			);
-
-			ctx.addScore(lastTile, 4);
-			ctx.addNat(lastTile, 2);
-		},
-		MatchFlags.None));
-
+	makeForestRules(rules);
 	makeSawmillRules(rules);
 
 	rules.push(new Rule("Make Fountain",
 		{
-			c: Tiles.Empty,
+			c: Tiles.Water,
 			u: Tiles.Path,
 			d: Tiles.Path,
 			l: Tiles.Path,
@@ -133,6 +111,59 @@ export function makeRules(): Rule[] {
 		MatchFlags.Rotate1));
 
 	return rules;
+}
+
+function makeForestRules(rules: Rule[]) {
+	rules.push(new Rule("Make Forest",
+		{
+			c: Tiles.Tree,
+			u: Tiles.Tree,
+			ul: Tiles.Tree,
+			l: Tiles.Tree,
+		},
+		(ctx, area, rot) => {
+			// Choose the newest tile to become the forest
+			const tiles = [area.c, area.u, area.ul, area.l];
+			const lastTile = pickLastActIndex(tiles);
+
+			ctx.mergeTilesInto(
+				lastTile,
+				tiles.filter(t => t !== lastTile),
+				Tiles.Forest
+			);
+
+			ctx.addScore(lastTile, 4);
+			ctx.addNat(lastTile, 2);
+		},
+		MatchFlags.None));
+
+	rules.push(new Rule("Forest Growth L",
+		{
+			c: Tiles.Tree,
+			u: Tiles.Forest,
+			ul: Tiles.Forest,
+			l: Tiles.Forest,
+		},
+		(ctx, area, rot) => {
+			ctx.replaceTile(area.c, Tiles.Forest);
+			ctx.addScore(area.c, 4);
+			ctx.addNat(area.c, 2);
+		},
+		MatchFlags.Rotate4));
+
+	rules.push(new Rule("Forest Growth T",
+		{
+			c: Tiles.Tree,
+			u: Tiles.Forest,
+			r: Tiles.Forest,
+			l: Tiles.Forest,
+		},
+		(ctx, area, rot) => {
+			ctx.replaceTile(area.c, Tiles.Forest);
+			ctx.addScore(area.c, 4);
+			ctx.addNat(area.c, 2);
+		},
+		MatchFlags.Rotate4));
 }
 
 function makeSawmillRules(rules: Rule[]) {

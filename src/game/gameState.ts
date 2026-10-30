@@ -198,6 +198,13 @@ export class CTX {
 
 	//#region Model Creation
 
+	public destroyOldModels(collection: ModelCollection,
+		duration: number = Anims.BaseDur,
+		delay: number = 0.5 * Anims.BaseDur) {
+		console.log("destroy old models", collection.models.length)
+		this.addAnim(collection.destroyAll_anim(duration)?.delayed(delay))
+	}
+
 	public growMeshOnTile(
 		collection: ModelCollection,
 		tile: Tile,
@@ -208,6 +215,7 @@ export class CTX {
 		rot: quat4 = new quat4(),
 		duration: number = Anims.BaseDur,
 		delay: number = 0,
+		animRotation: boolean = true,
 	): BatchedInstance {
 		// Create initial model
 		const model = this.renderer.addModel(
@@ -219,7 +227,7 @@ export class CTX {
 
 		// Animate to target transform
 		this.addAnim(Anims.growModelTRS(
-			model, pos, rot, scale as float3, duration
+			model, pos, rot, scale as float3, duration, animRotation ? {} : { rot: rot.clone() }
 		).delayed(delay));
 
 		return model;
@@ -306,6 +314,7 @@ export class GameState {
 		this.addItem(Tiles.House1, 1);
 		this.addItem(Tiles.Path, 1);
 		this.addItem(Tiles.Tree, 1);
+		this.addItem(Tiles.Water, 1);
 	}
 
 	public clearGame() {

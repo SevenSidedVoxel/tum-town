@@ -174,10 +174,15 @@ export namespace Anims {
 		targetPos: float3,
 		targetRot: quat4,
 		targetScale: float3,
-		duration: number = Anims.BaseDur): GameAnim {
-		let initPos = new float3();
-		let initRot = new quat4();
-		let initScale = new float3();
+		duration: number = Anims.BaseDur,
+		init: {
+			pos?: float3,
+			rot?: quat4,
+			scale?: float3,
+		} = {}): GameAnim {
+		let initPos = init?.pos ?? new float3();
+		let initRot = init?.rot ?? new quat4();
+		let initScale = init?.scale ?? new float3();
 
 		return new GameAnim({
 			name: growModelTRS.name,

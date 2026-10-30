@@ -264,7 +264,118 @@ export const Tiles = {
 		},
 	},
 
-	Water: { name: "water", color: Colors3.tileWater },
+	Water: {
+		name: "water",
+		model: a => a.model_Water,
+		color: Colors3.tileWater,
+		interact(ctx, tile) { },
+		regen(ctx, tile) {
+			let waterModelID = 0;
+			let rot = 0;
+
+			calcWaterConnection();
+
+			function calcWaterConnection() {
+				// Calculate water connections
+				const adj = ctx.grid.getAdj8(tile.pos);
+				const isWaterU = adj.u.type == Tiles.Water;
+				const isWaterD = adj.d.type == Tiles.Water;
+				const isWaterL = adj.l.type == Tiles.Water;
+				const isWaterR = adj.r.type == Tiles.Water;
+				const isWaterUL = adj.ul.type == Tiles.Water;
+				const isWaterUR = adj.ur.type == Tiles.Water;
+				const isWaterDL = adj.dl.type == Tiles.Water;
+				const isWaterDR = adj.dr.type == Tiles.Water;
+				const count4 = 0
+					+ (isWaterU ? 1 : 0)
+					+ (isWaterD ? 1 : 0)
+					+ (isWaterL ? 1 : 0)
+					+ (isWaterR ? 1 : 0);
+				if (count4 == 0) {
+					waterModelID = 0; // Puddle
+					rot = 0;
+					return;
+				}
+
+				if (count4 == 1) {
+					waterModelID = 1; // End
+					rot = isWaterR ? 0
+						: isWaterU ? 1
+							: isWaterL ? 2
+								: 3;
+					return;
+				}
+
+				if (count4 == 2) {
+					// Check for straight segments
+					{
+						if (isWaterL && isWaterR) {
+							waterModelID = 2; // I
+							rot = 0;
+							return;
+						}
+
+						if (isWaterU && isWaterD) {
+							waterModelID = 2; // I
+							rot = 1;
+							return;
+						}
+					}
+
+					// Water must be an L-bend
+					waterModelID = 3; // L
+					if (isWaterR) {
+						if (isWaterU) rot = 1;
+						else rot = 0;
+					}
+					else {
+						// water must be on the left here
+						if (isWaterU) rot = 2;
+						else rot = 3;
+					}
+					return;
+				}
+
+				if (count4 == 3) {
+					waterModelID = 4; // T
+					if (!isWaterU) rot = 0;
+					else if (!isWaterL) rot = 1;
+					else if (!isWaterR) rot = 3;
+					else rot = 2;
+					return;
+				}
+
+				waterModelID = 5; // X
+			}
+
+			const cachedWaterID = waterModelID << 0x2 | rot & 0x2;
+			if (tile.firstTimeBuild() || tile.rot != cachedWaterID) {
+				tile.rot = cachedWaterID;
+
+				// Add model
+				const rng = tile.rng(ctx);
+				const centerPos = Tile.calcVisualCenterPos(tile.pos);
+				const size = 1;
+				const zDeg = rot * 90;
+				const model = ctx.assets.model_WaterTiles[waterModelID]!;
+
+				// Destroy old models
+				ctx.destroyOldModels(tile.models);
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					model,
+					new color3(this.color),
+					centerPos,
+					new float3(size, size, size),
+					Utils3.rotZDeg(zDeg),
+					Anims.BaseDur,
+					0,
+					false,
+				);
+			}
+		},
+	},
 } as const satisfies Record<string, TileType>;
 
 function makeSimpleBuilding(

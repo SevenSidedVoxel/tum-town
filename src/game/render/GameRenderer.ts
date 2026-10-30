@@ -50,6 +50,9 @@ export class RenderAssets {
 	public model_Tree1!: number;
 	public model_SingleTrees!: number[];
 
+	public model_Water!: number;
+	public model_WaterTiles!: number[];
+
 	loadModels(gltf: GLTF, batch: BatchedMesh) {
 		this.model_Missing = batch.addGeometry(new THREE.BoxGeometry(0.5, 0.5, 0.5));
 		this.model_LineSeg = addGeom(this, 'line_seg');
@@ -77,6 +80,18 @@ export class RenderAssets {
 		];
 		this.model_Tree1 = this.model_SingleTrees[0]!;
 		this.model_SingleTrees.push(this.model_Tree1); // make Tree1 more likely
+
+		this.model_Water = addGeom(this, 'water_0');
+		this.model_WaterTiles = [
+			this.model_Water,
+			addGeom(this, 'water_end'),
+			addGeom(this, 'water_I'),
+			addGeom(this, 'water_L'),
+			addGeom(this, 'water_T'),
+			addGeom(this, 'water_X'),
+		];
+
+		return;
 
 		function addGeom(self: RenderAssets, name: string) {
 			let geom = gltf.scene.getGeometryByName(name);

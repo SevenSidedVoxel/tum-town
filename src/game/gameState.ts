@@ -14,6 +14,7 @@ import { ModelCollection } from "./ModelCollection";
 import { color3, float3, quat4 } from "../utils/threeUtils";
 import { BatchedInstance } from "./render/BatchedInstance";
 import { Colors3 } from "../styles/colors";
+import { trs3D } from "../utils/renderUtils";
 
 const shouldLogTileDataUpdates = false;
 
@@ -200,8 +201,7 @@ export class CTX {
 
 	public destroyOldModels(collection: ModelCollection,
 		duration: number = Anims.BaseDur,
-		delay: number = 0.5 * Anims.BaseDur) {
-		console.log("destroy old models", collection.models.length)
+		delay: number = 0.75 * Anims.BaseDur) {
 		this.addAnim(collection.destroyAll_anim(duration)?.delayed(delay))
 	}
 
@@ -233,6 +233,56 @@ export class CTX {
 		return model;
 	}
 
+	public growMesh({
+		collection,
+		tile,
+		mesh,
+		target = {
+			pos: new float3(tile.pos.x, tile.pos.y, 0),
+			rot: new quat4(),
+			scale: new float3().setScalar(1),
+		},
+		anim = {
+			duration: Anims.BaseDur,
+			delay: 0,
+			scaleOnly: false,
+		},
+	}: {
+		collection: ModelCollection,
+		tile: Tile,
+		mesh: {
+			modelID: number,
+			color: color3,
+		},
+		target: trs3D,
+		anim?: {
+			duration?: number,
+			delay?: number,
+			scaleOnly: boolean,
+		},
+	}): BatchedInstance {
+		// Extract Args (with Defaults)
+		const duration = anim.duration ?? Anims.BaseDur;
+		const delay = anim.delay ?? 0;
+		const scaleOnly = anim.scaleOnly ?? false;
+
+		// Create initial model
+		const model = this.renderer.addModel_TRS(
+			mesh.modelID,
+			scaleOnly ? target.pos : new float3(tile.pos.x, tile.pos.y, 0),
+			scaleOnly ? target.rot : new quat4(),
+			new float3(),
+			mesh.color,
+			collection);
+
+		// Animate to target transform
+		this.addAnim(Anims.growModelTRS(
+			model, target.pos, target.rot, target.scale, duration
+		).delayed(delay));
+
+		return model;
+	}
+
 	//#endregion Model Creation
 
 	//#region GameState Access
@@ -256,11 +306,27 @@ export class CTX {
 
 		addRotations(this, 1, 6, Tiles.House1);
 
-		addRotations(this, 1, 5, Tiles.Tree);
-		addRotations(this, 5, 5, Tiles.Forest);
+		addTile(this, 5, 6, Tiles.Tree);
+		addTile(this, 6, 6, Tiles.Tree);
+		addTile(this, 7, 6, Tiles.Forest);
+		addTile(this, 8, 6, Tiles.Forest);
 
 		addRotations(this, 1, 4, Tiles.Path);
-		addRotations(this, 5, 4, Tiles.Fountain);
+		addTile(this, 5, 4, Tiles.Fountain);
+
+		addTile(this, 1, 3, Tiles.Water);
+		addTile(this, 2, 3, Tiles.Water);
+		addTile(this, 3, 3, Tiles.Water);
+		addTile(this, 4, 3, Tiles.Water);
+		addTile(this, 5, 3, Tiles.Water);
+		addTile(this, 1, 2, Tiles.Water);
+		addTile(this, 2, 2, Tiles.Water);
+		addTile(this, 4, 2, Tiles.Water);
+		addTile(this, 4, 1, Tiles.Water);
+		addTile(this, 3, 2, Tiles.Path);
+		addTile(this, 5, 2, Tiles.Path);
+
+		this.game.applyRules(this);
 
 		this.regenVisuals();
 		this.endAndAddCombinedAnim();
@@ -270,6 +336,10 @@ export class CTX {
 			self.replaceTile(self.game.grid.get(xStart++, y), tileType, 90);
 			self.replaceTile(self.game.grid.get(xStart++, y), tileType, 180);
 			self.replaceTile(self.game.grid.get(xStart++, y), tileType, 270);
+		}
+
+		function addTile(self, x, y, tileType) {
+			self.replaceTile(self.game.grid.get(x, y), tileType, 0);
 		}
 	}
 }
@@ -421,6 +491,11 @@ export class GameState {
 		// Ensure the tile is available
 		if (!this.hasItem(type))
 			return false; // no item
+
+		// Ensure the tile is in bounds
+		if (tile.pos.x < 1 || tile.pos.x > this.grid.size - 2
+			|| tile.pos.y < 1 || tile.pos.y > this.grid.size - 2)
+			return false;
 
 		// Check if the tile type has a custom placement function
 		if (type.canPlace)

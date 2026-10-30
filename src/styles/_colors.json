@@ -34,5 +34,8 @@
 	"tileWater": "#1a4a71",
 	"tileTree1": "#2b6228",
 	"tileTree2": "#40943d",
-	"tileTree3": "#55b853"
+	"tileTree3": "#55b853",
+
+	"floorDirt": "#201c18",
+	"floorForest": "#0c2918"
 }

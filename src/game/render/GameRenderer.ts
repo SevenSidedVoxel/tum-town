@@ -5,7 +5,7 @@ import { P2 } from "../P2";
 import glbModelsUrl from '../../data/models.glb';
 
 import { Frame as Frame } from '../Frame';
-import { GameState } from '../GameState';
+import { CTX, GameState } from '../GameState';
 
 import '../../utils/domUtils';
 import '../../utils/threeUtils';
@@ -20,7 +20,8 @@ import { degToRad } from 'three/src/math/MathUtils.js';
 export const dev_ShouldAddVisualDevModels = false;
 
 export const Z_PathDepth = -0.01;
-export const Z_TileBG = -0.02;
+export const Z_GroundDepth = -0.02;
+export const Z_TileBG = -0.03;
 
 export class RenderAssets {
 	public texPalette: THREE.Texture | undefined;
@@ -52,6 +53,7 @@ export class RenderAssets {
 
 	public model_Water!: number;
 	public model_WaterTiles!: number[];
+	public model_Bridge!: number;
 
 	loadModels(gltf: GLTF, batch: BatchedMesh) {
 		this.model_Missing = batch.addGeometry(new THREE.BoxGeometry(0.5, 0.5, 0.5));
@@ -83,13 +85,23 @@ export class RenderAssets {
 
 		this.model_Water = addGeom(this, 'water_0');
 		this.model_WaterTiles = [
-			this.model_Water,
-			addGeom(this, 'water_end'),
+			this.model_Water, // isolated
+			addGeom(this, 'water_End'),
 			addGeom(this, 'water_I'),
 			addGeom(this, 'water_L'),
+			addGeom(this, 'water_L_fill'),
 			addGeom(this, 'water_T'),
+			addGeom(this, 'water_T_fill_L'),
+			addGeom(this, 'water_T_fill_R'),
+			addGeom(this, 'water_T_fill'),
 			addGeom(this, 'water_X'),
+			addGeom(this, 'water_X_fill_1'),
+			addGeom(this, 'water_X_fill_2H'),
+			addGeom(this, 'water_X_fill_2O'),
+			addGeom(this, 'water_X_fill_3'),
+			addGeom(this, 'water_Full'),
 		];
+		this.model_Bridge = addGeom(this, 'bridge');
 
 		return;
 
@@ -683,6 +695,18 @@ if(vShouldDepthShade > 0.0)
 		const matrix = new mat4x4()
 			.compose(pos, rotation, scale);
 		return this.addModel_Mat(modelID, pos, rotation, scale, matrix, color, collection);
+	}
+
+	public addModel_TRS(
+		modelID: number,
+		pos: float3,
+		rot: quat4,
+		scale: float3,
+		color: color3,
+		collection: ModelCollection | null = null) {
+		const matrix = new mat4x4()
+			.compose(pos, rot, scale);
+		return this.addModel_Mat(modelID, pos, rot, scale, matrix, color, collection);
 	}
 
 	public addModel_Mat(

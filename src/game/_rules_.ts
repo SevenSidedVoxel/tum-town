@@ -105,6 +105,33 @@ export function makeRules(): Rule[] {
 		},
 		MatchFlags.None));
 
+	rules.push(new Rule("Make Bridge",
+		{
+			c: Tiles.Water,
+			u: Tiles.Water,
+			d: Tiles.Water,
+			l: Tiles.Path,
+			r: Tiles.Path,
+		},
+		(ctx, area, rot) => {
+			ctx.replaceTile(area.c, Tiles.Bridge);
+			ctx.addScore(area.c, 2);
+		},
+		MatchFlags.Rotate1));
+	rules.push(new Rule("Make Bridge",
+		{
+			c: Tiles.Path,
+			u: Tiles.Water,
+			d: Tiles.Water,
+			l: Tiles.Path,
+			r: Tiles.Path,
+		},
+		(ctx, area, rot) => {
+			ctx.replaceTile(area.c, Tiles.Bridge);
+			ctx.addScore(area.c, 2);
+		},
+		MatchFlags.Rotate1));
+
 	return rules;
 }
 

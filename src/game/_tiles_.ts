@@ -4,7 +4,8 @@ import { Anims } from "./GameAnims";
 import { CTX } from "./GameState";
 import { P2 } from "./P2";
 import { Pathing } from "./PathSystem";
-import { RenderAssets, Z_PathDepth } from "./render/GameRenderer";
+import { RenderAssets, Z_GroundDepth, Z_PathDepth } from "./render/GameRenderer";
+import { calcFillTileType } from './render/FillTileTypes';
 import { RandomSlice } from "./SeededRandom";
 import { Tile, TileType } from "./Tile";
 
@@ -117,6 +118,8 @@ export const Tiles = {
 					Utils3.rotZDeg(zDeg),
 				);
 			}
+
+			// addGroundPath(ctx, tile, tile.rng(ctx), "small", Colors3.floorDirt);
 		}
 	},
 	Fountain: {
@@ -151,7 +154,7 @@ export const Tiles = {
 			baseSize: 0.6,
 		},
 		color: Colors3.tileTree1,
-		centerVariance: 0.1,
+		centerVariance: 0.05,
 		place(ctx, tile) {
 			ctx.addScore(tile, 1);
 			ctx.replaceTile(tile, this);
@@ -190,7 +193,7 @@ export const Tiles = {
 					-1, 1,
 					-1, 1
 				);
-				center.mulXY(0.2, 0.2);
+				center.mulXY(0.25, 0.25);
 			}
 			const centerPos = new float3(center.x, center.y - 0.1, 0)
 				.add({ x: tile.pos.x, y: tile.pos.y, z: 0 });
@@ -212,6 +215,8 @@ export const Tiles = {
 					new float3().setScalar(rng.nextF(0.9, 1)),
 					Utils3.rotZRad(rng.nextRadians())
 				);
+
+				addGroundPath(ctx, tile, rng, "small", Colors3.floorForest);
 				return;
 			}
 			else {
@@ -260,6 +265,8 @@ export const Tiles = {
 						Utils3.rotZRad(rng.nextRadians()),
 					);
 				}
+
+				addGroundPath(ctx, tile, rng, "large", Colors3.floorForest);
 			}
 		},
 	},
@@ -268,111 +275,97 @@ export const Tiles = {
 		name: "water",
 		model: a => a.model_Water,
 		color: Colors3.tileWater,
-		interact(ctx, tile) { },
 		regen(ctx, tile) {
-			let waterModelID = 0;
-			let rot = 0;
-
-			calcWaterConnection();
-
-			function calcWaterConnection() {
-				// Calculate water connections
-				const adj = ctx.grid.getAdj8(tile.pos);
-				const isWaterU = adj.u.type == Tiles.Water;
-				const isWaterD = adj.d.type == Tiles.Water;
-				const isWaterL = adj.l.type == Tiles.Water;
-				const isWaterR = adj.r.type == Tiles.Water;
-				const isWaterUL = adj.ul.type == Tiles.Water;
-				const isWaterUR = adj.ur.type == Tiles.Water;
-				const isWaterDL = adj.dl.type == Tiles.Water;
-				const isWaterDR = adj.dr.type == Tiles.Water;
-				const count4 = 0
-					+ (isWaterU ? 1 : 0)
-					+ (isWaterD ? 1 : 0)
-					+ (isWaterL ? 1 : 0)
-					+ (isWaterR ? 1 : 0);
-				if (count4 == 0) {
-					waterModelID = 0; // Puddle
-					rot = 0;
-					return;
-				}
-
-				if (count4 == 1) {
-					waterModelID = 1; // End
-					rot = isWaterR ? 0
-						: isWaterU ? 1
-							: isWaterL ? 2
-								: 3;
-					return;
-				}
-
-				if (count4 == 2) {
-					// Check for straight segments
-					{
-						if (isWaterL && isWaterR) {
-							waterModelID = 2; // I
-							rot = 0;
-							return;
-						}
-
-						if (isWaterU && isWaterD) {
-							waterModelID = 2; // I
-							rot = 1;
-							return;
-						}
-					}
-
-					// Water must be an L-bend
-					waterModelID = 3; // L
-					if (isWaterR) {
-						if (isWaterU) rot = 1;
-						else rot = 0;
-					}
-					else {
-						// water must be on the left here
-						if (isWaterU) rot = 2;
-						else rot = 3;
-					}
-					return;
-				}
-
-				if (count4 == 3) {
-					waterModelID = 4; // T
-					if (!isWaterU) rot = 0;
-					else if (!isWaterL) rot = 1;
-					else if (!isWaterR) rot = 3;
-					else rot = 2;
-					return;
-				}
-
-				waterModelID = 5; // X
-			}
-
-			const cachedWaterID = waterModelID << 0x2 | rot & 0x2;
+			const [fill, rot] = calcFillTileType(ctx, tile, t => t.type == Tiles.Water || t.type == Tiles.Bridge);
+			const cachedWaterID = fill << 0x2 | rot & 0x2;
 			if (tile.firstTimeBuild() || tile.rot != cachedWaterID) {
 				tile.rot = cachedWaterID;
 
 				// Add model
-				const rng = tile.rng(ctx);
 				const centerPos = Tile.calcVisualCenterPos(tile.pos);
 				const size = 1;
 				const zDeg = rot * 90;
-				const model = ctx.assets.model_WaterTiles[waterModelID]!;
+				const model = ctx.assets.model_WaterTiles[fill]!;
 
 				// Destroy old models
 				ctx.destroyOldModels(tile.models);
-				ctx.growMeshOnTile(
-					tile.models,
-					tile,
-					model,
-					new color3(this.color),
-					centerPos,
-					new float3(size, size, size),
-					Utils3.rotZDeg(zDeg),
-					Anims.BaseDur,
-					0,
-					false,
-				);
+				ctx.growMesh({
+					collection: tile.models,
+					tile: tile,
+					mesh: {
+						modelID: model,
+						color: new color3(this.color),
+					},
+					target:
+					{
+						pos: centerPos,
+						scale: new float3(size, size, size),
+						rot: Utils3.rotZDeg(zDeg),
+					},
+					anim: {
+						scaleOnly: true,
+					}
+				});
+			}
+		},
+	},
+
+	Bridge: {
+		name: "bridge",
+		model: a => a.model_Bridge,
+		color: Colors3.tileBridge,
+		pathing: Pathing.ConnectAll_Adj4(),
+		regen(ctx, tile) {
+			const [waterFill, waterRot] = calcFillTileType(ctx, tile, t => t.type == Tiles.Water);
+			const cachedWaterID = waterFill << 0x2 | waterRot & 0x2;
+			if (tile.firstTimeBuild() || tile.rot != cachedWaterID) {
+				tile.rot = cachedWaterID;
+
+				// Calc model position
+				const centerPos = Tile.calcVisualCenterPos(tile.pos);
+				const rot = Utils3.rotZDeg(waterRot * 90);
+
+				// Destroy old models
+				ctx.destroyOldModels(tile.models);
+
+				// Add water model
+				const waterModel = ctx.assets.model_WaterTiles[waterFill]!;
+				ctx.growMesh({
+					collection: tile.models,
+					tile: tile,
+					mesh: {
+						modelID: waterModel,
+						color: Colors3.tileWater,
+					},
+					target:
+					{
+						pos: centerPos,
+						scale: new float3().setScalar(1),
+						rot: rot,
+					},
+					anim: {
+						scaleOnly: true,
+					}
+				});
+
+				// Add Bridge Model
+				ctx.growMesh({
+					collection: tile.models,
+					tile: tile,
+					mesh: {
+						modelID: ctx.assets.model_Bridge,
+						color: new color3(this.color),
+					},
+					target:
+					{
+						pos: centerPos.clone().setZ(Z_PathDepth),
+						scale: new float3().setScalar(1),
+						rot: rot,
+					},
+					anim: {
+						scaleOnly: true,
+					}
+				});
 			}
 		},
 	},
@@ -425,13 +418,13 @@ function makeSimpleBuilding(
 	};
 }
 
-function addGroundPath(ctx: CTX, tile: Tile, rng: RandomSlice, size: 'small' | 'large') {
+function addGroundPath(ctx: CTX, tile: Tile, rng: RandomSlice, size: 'small' | 'large', color: color3 = Colors3.tileRoad1) {
 	ctx.growMeshOnTile(
 		tile.models,
 		tile,
 		size == 'small' ? ctx.assets.model_PathGround_Small : ctx.assets.model_PathGround_Large,
-		Colors3.tileRoad1,
-		new float3(tile.pos.x, tile.pos.y, Z_PathDepth),
+		color,
+		new float3(tile.pos.x, tile.pos.y, Z_GroundDepth),
 		new float3().setScalar(1),
 		Utils3.rotZRad(rng.nextRadians()),
 	);

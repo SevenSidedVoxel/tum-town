@@ -17,8 +17,6 @@ import { color3, float2, float3, float4, mat4x4, quat4, Utils3, ZAxis } from "..
 import { BatchedInstance } from './BatchedInstance';
 import { degToRad } from 'three/src/math/MathUtils.js';
 
-export const dev_ShouldAddVisualDevModels = false;
-
 export const Z_PathDepth = -0.01;
 export const Z_GroundDepth = -0.02;
 export const Z_TileBG = -0.03;
@@ -50,6 +48,8 @@ export class RenderAssets {
 
 	public model_Tree1!: number;
 	public model_SingleTrees!: number[];
+	public model_BigTree!: number;
+	public model_GrassPatch!: number;
 
 	public model_Water!: number;
 	public model_WaterTiles!: number[];
@@ -78,10 +78,13 @@ export class RenderAssets {
 		this.model_SingleTrees = [
 			addGeom(this, 'tree.001'),
 			addGeom(this, 'tree.002'),
-			// addGeom(this, 'tree.003'),
+			addGeom(this, 'tree.003'),
+			addGeom(this, 'tree.004'),
 		];
 		this.model_Tree1 = this.model_SingleTrees[0]!;
 		this.model_SingleTrees.push(this.model_Tree1); // make Tree1 more likely
+		this.model_BigTree = addGeom(this, 'tree_big.001');
+		this.model_GrassPatch = addGeom(this, 'grass.001');
 
 		this.model_Water = addGeom(this, 'water_0');
 		this.model_WaterTiles = [

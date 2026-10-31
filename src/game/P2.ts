@@ -23,6 +23,8 @@ export class P2 {
 	public toString() { return `(${this.x}, ${this.y})`; }
 	public name() { return `${coordToLetter(this.x)}${this.y}`; }
 
+	public equals(p: P2) { return p.x == this.x && p.y == this.y; }
+
 	public addS(s: number) {
 		this.x += s;
 		this.y += s;

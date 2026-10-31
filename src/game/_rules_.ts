@@ -114,6 +114,52 @@ export function makeRules(): Rule[] {
 }
 
 function makeForestRules(rules: Rule[]) {
+	rules.push(new Rule("Make Big Tree",
+		{
+			c: Tiles.Tree,
+			ul: Tiles.Tree,
+			u: Tiles.Tree,
+			ur: Tiles.Tree,
+			l: Tiles.Tree,
+			r: Tiles.Tree,
+			dl: Tiles.Tree,
+			d: Tiles.Tree,
+			dr: Tiles.Tree,
+		},
+		(ctx, area, rot) => {
+			ctx.mergeTilesInto(
+				area.c,
+				[
+					area.ul, area.u, area.ur,
+					area.l, area.r,
+					area.dl, area.d, area.dr
+				],
+				Tiles.BigTree
+			);
+
+			ctx.addScore(area.c, 16);
+			ctx.addNat(area.c, 8);
+		},
+		MatchFlags.None));
+	rules.push(new Rule("Make Big Tree in Forest",
+		{
+			c: Tiles.Forest,
+			ul: Tiles.Forest,
+			u: Tiles.Forest,
+			ur: Tiles.Forest,
+			l: Tiles.Forest,
+			r: Tiles.Forest,
+			dl: Tiles.Forest,
+			d: Tiles.Forest,
+			dr: Tiles.Forest,
+		},
+		(ctx, area, rot) => {
+			ctx.replaceTile(area.c, Tiles.BigTree);
+			ctx.addScore(area.c, 16);
+			ctx.addNat(area.c, 8);
+		},
+		MatchFlags.None));
+
 	rules.push(new Rule("Make Forest",
 		{
 			c: Tiles.Tree,

@@ -17,6 +17,7 @@ import { Colors3 } from "../styles/colors";
 import { trs3D } from "../utils/renderUtils";
 
 const shouldLogTileDataUpdates = false;
+export const dev_ShouldAddDevVisualModels = true;
 
 export class CTX {
 	public game: GameState;
@@ -124,24 +125,48 @@ export class CTX {
 		return false;
 	}
 
-	public canPlaceTile(tile: Tile, type: TileType) { return this.game.canPlaceTile(tile, type); }
+	public canPlaceItem(tile: Tile, item: TileType) { return this.game.canPlaceTile(tile, item); }
 
-	public placeTile(tile: Tile, type: TileType) {
-		if (!this.canPlaceTile(tile, type))
+	public placeItem(tile: Tile, type: TileType) {
+		if (!this.canPlaceItem(tile, type))
 			return; // Cannot place
 
+		// Consume item
 		this.game.consumeItem(type);
 
 		// Place item
-		if (type.place)
-			type.place(this, tile);
-		else
-			this.replaceTile(tile, type);
+		if (type.place) type.place(this, tile);
+		else this.replaceTile(tile, type);
 		this.regenVisuals();
 
 		// Apply rules
-		this.game.applyRules(this);
+		this.applyRules();
+	}
+
+	public tryPlaceItems(tiles: Tile[], item: TileType): boolean {
+		if (!this.game.hasItem(item, tiles.length))
+			return false; // Not enough items
+
+		// Check each placement is valid
+		for (const tile of tiles) {
+			if (!this.canPlaceItem(tile, item))
+				return false;
+		}
+
+		// Consume items
+		this.game.consumeItem(item, tiles.length);
+
+		// Place each item
+		for (const tile of tiles) {
+			if (item.place) item.place(this, tile);
+			else this.replaceTile(tile, item);
+		}
 		this.regenVisuals();
+
+		// Apply rules
+		this.applyRules();
+
+		return true;
 	}
 
 	public replaceTile(tile: Tile, type: TileType, rot: number | null = null) {
@@ -193,6 +218,11 @@ export class CTX {
 		this.addAnim(regenAnim?.delayed(delay));
 
 		this.endAndAddCombinedAnim();
+	}
+
+	private applyRules() {
+		this.game.applyRules(this);
+		this.regenVisuals();
 	}
 
 	//#endregion Tile Actions
@@ -293,23 +323,24 @@ export class CTX {
 
 	//#endregion GameState Access
 
-	public addVisualDevModels() {
+	public addDevVisualModels() {
 		// Dev: Add various models for visual development
-		console.warn("Adding Visual Dev Models");
+		console.warn("Adding Dev Visual Models");
 		this.startCombinedAnim();
 
 		addRotations(this, 1, 8, Tiles.House2);
 		addRotations(this, 5, 8, Tiles.House3);
 
 		addRotations(this, 1, 7, Tiles.Factory1);
-		addRotations(this, 5, 7, Tiles.Sawmill);
 
 		addRotations(this, 1, 6, Tiles.House1);
+		addRotations(this, 5, 6, Tiles.Sawmill);
 
-		addTile(this, 5, 6, Tiles.Tree);
-		addTile(this, 6, 6, Tiles.Tree);
-		addTile(this, 7, 6, Tiles.Forest);
-		addTile(this, 8, 6, Tiles.Forest);
+		addTile(this, 4, 5, Tiles.Tree);
+		addTile(this, 5, 5, Tiles.Tree);
+		addTile(this, 6, 5, Tiles.Forest);
+		addTile(this, 7, 5, Tiles.Forest);
+		addTile(this, 8, 5, Tiles.BigTree);
 
 		addRotations(this, 1, 4, Tiles.Path);
 		addTile(this, 5, 4, Tiles.Fountain);
@@ -326,9 +357,7 @@ export class CTX {
 		addTile(this, 3, 2, Tiles.Path);
 		addTile(this, 5, 2, Tiles.Path);
 
-		this.game.applyRules(this);
-
-		this.regenVisuals();
+		this.applyRules();
 		this.endAndAddCombinedAnim();
 
 		function addRotations(self, xStart, y, tileType) {
@@ -511,14 +540,13 @@ export class GameState {
 
 	//#region Items
 
-	public hasItem(type: TileType) {
+	public hasItem(type: TileType, count: number = 1) {
 		if (this.isCreative)
 			return true;
 
 		for (const item of this.items) {
-			if (item.type === type
-				&& item.count > 0)
-				return true;
+			if (item.type === type)
+				return item.count >= count;
 		}
 
 		return false;
@@ -541,7 +569,7 @@ export class GameState {
 		this.items.push(item);
 	}
 
-	public consumeItem(type: TileType) {
+	public consumeItem(type: TileType, count: number = 1) {
 		if (this.isCreative)
 			return;
 
@@ -549,7 +577,7 @@ export class GameState {
 			if (item.type !== type)
 				continue;
 
-			item.count--;
+			item.count -= count;
 			if (item.count < 1) {
 				this.renderer.freeIcon(item.icon);
 				this.items.splice(index, 1);

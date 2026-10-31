@@ -259,7 +259,6 @@ export const Tiles = {
 				const centerPos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
 
 				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
-
 				const positions = [
 					new P2(0.5, 0.5),
 					new P2(0.25, 0.25),
@@ -281,7 +280,38 @@ export const Tiles = {
 						new float3().setScalar(rng.nextF(0.7, 1)),
 						Utils3.rotZRad(rng.nextRadians()),
 					);
-				}				
+				}
+			}
+		},
+	},
+	BigTree: {
+		name: "big tree",
+		model: a => a.model_BigTree,
+		color: Colors3.tileTree1,
+		regen(ctx, tile) {
+			if (tile.firstTimeBuild()) {
+				const rng = tile.rng(ctx);
+				const centerPos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
+
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					ctx.assets.getModel(this.model),
+					new color3(this.color),
+					centerPos,
+					new float3().setScalar(rng.nextF(0.9, 1)),
+					Utils3.rotZRad(tile.rot ?? 0),
+				);
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					ctx.assets.model_GrassPatch,
+					Colors3.tileTree1,
+					centerPos,
+					new float3().setScalar(rng.nextF(0.9, 1)),
+					Utils3.rotZDeg(rng.nextI(0, 3) * 90),
+				);
 			}
 		},
 	},

@@ -2,12 +2,12 @@ import { IView, AppCtx } from "../AppCtx";
 import { P2 } from "../game/P2";
 import { Frame } from "../game/Frame";
 import { GameAnim } from "../game/GameAnims";
-import { CTX, GameState } from "../game/GameState";
-import { dev_ShouldAddVisualDevModels, GameRenderer } from "../game/render/GameRenderer";
+import { CTX, GameState, dev_ShouldAddDevVisualModels } from "../game/GameState";
+import { GameRenderer } from "../game/render/GameRenderer";
 import { Tile, TileType } from "../game/Tile";
 
 export const BuildTimestamp = __BUILD_TIMESTAMP__;
-export const BuildID = "backed";
+export const BuildID = "bigger";
 
 export class GameView implements IView {
 	private ctx: AppCtx;
@@ -80,9 +80,9 @@ export class GameView implements IView {
 		this.selectNextItem();
 
 		// Dev: Add Design Models
-		if (dev_ShouldAddVisualDevModels) {
+		if (dev_ShouldAddDevVisualModels) {
 			let ctx = new CTX(this.game);
-			ctx.addVisualDevModels();
+			ctx.addDevVisualModels();
 			ctx.finalize();
 
 			this.playNextAnim();
@@ -145,8 +145,8 @@ export class GameView implements IView {
 		const ctx = new CTX(this.game);
 		const tile = ctx.game.grid.get(pos);
 		if (this.selectedItem
-			&& ctx.canPlaceTile(tile, this.selectedItem)) {
-			ctx.placeTile(tile, this.selectedItem);
+			&& ctx.canPlaceItem(tile, this.selectedItem)) {
+			ctx.placeItem(tile, this.selectedItem);
 			ctx.finalize();
 
 			this.playNextAnim();
@@ -163,8 +163,31 @@ export class GameView implements IView {
 
 		// Anims.showInvalidAct(tile.Elem);
 	}
-	dragTile(start: P2, end: P2) {
-		// console.log(`drag ${start.name()} to ${end.name()}`);
+	dragTiles(start: P2, end: P2, positions: P2[]) {
+		// Try place objects on all dragged
+		if (!this.selectedItem) return; // no item to place
+
+		const ctx = new CTX(this.game);
+		const item = this.selectedItem;
+		
+		const tiles: Tile[] = [];
+		for (const pos of positions) {
+			const tile = ctx.game.grid.get(pos);
+			tiles.push(tile);
+		}
+
+		if (ctx.tryPlaceItems(tiles, item)) {
+			ctx.finalize();
+			this.playNextAnim();
+			this.hoverTileEnd();
+		}
+	}
+	dragOverTile(pos: P2) {
+		if (this.interactTiles.find(p => p.equals(pos)))
+			return; // already in set
+
+		console.log(`drag over ${pos.name()}`);
+		this.interactTiles.push(pos);
 	}
 
 	private hoverPos: P2 | null = null;
@@ -200,7 +223,11 @@ export class GameView implements IView {
 		}
 	}
 	selectItem = (index: number) => {
-		this.selectedItem = this.game.items[index]?.type ?? null;
+		const item = this.game.items[index]?.type ?? null;
+		if (this.selectedItem == item)
+			this.selectedItem = null; // deselect item
+		else
+			this.selectedItem = item;
 		this.updateItemDisplay();
 	}
 
@@ -209,7 +236,7 @@ export class GameView implements IView {
 		if (this.hoverPos)
 			this.hoverTileStart(this.hoverPos);
 
-		this.nextItemButton.textContent = `${this.selectedItem?.name ?? 'None'}`;
+		this.nextItemButton.textContent = `${this.selectedItem?.name ?? '---'}`;
 
 		let itemsHtml = /*html*/`<div class="game-act-icons">`;
 
@@ -294,7 +321,8 @@ export class GameView implements IView {
 	private worldPos: P2 | null = null;
 	private gridPos: P2 | null = null;
 
-	private startPressedTile: P2 | null = null;
+	private firstInteractTile: P2 | null = null;
+	private interactTiles: P2[] = [];
 
 	private stateDebugAnim: number | undefined;
 
@@ -348,8 +376,20 @@ export class GameView implements IView {
 
 		if (this.hoverPos !== this.gridPos) {
 			this.hoverTileEnd();
-			if (this.gridPos)
+			if (this.gridPos) {
 				this.hoverTileStart(this.gridPos);
+
+				if (this.firstInteractTile != null) {
+					// Drag in process
+					// Ensure the drag is close enough to the middle of the tile to trigger the dragOverTile handler
+					const delta = this.worldPos!.subV(this.gridPos);
+					const dist = delta.len2();
+					const MaxDist = 0.4;
+					if (dist <= MaxDist * MaxDist) {
+						this.dragOverTile(this.gridPos);
+					}
+				}
+			}
 		}
 	}
 
@@ -363,29 +403,41 @@ export class GameView implements IView {
 		if (this.gridPos)
 			this.endPressTile(this.gridPos);
 		else
-			this.startPressedTile = null;
+			this.endInteraction();
 	}
 
 	handlePointerCancel = (e) => {
-		this.startPressedTile = null;
+		this.endInteraction();
+
 	}
 
 	startPressTile(coord: P2) {
-		this.startPressedTile = coord;
+		this.firstInteractTile = coord;
+		this.interactTiles.push(this.firstInteractTile);
 	}
 	endPressTile(pos: P2) {
-		if (this.startPressedTile === null)
+		if (this.firstInteractTile === null)
 			return; // press was cancelled or moved off tile
 
-		if (this.startPressedTile.x !== pos.x
-			|| this.startPressedTile.y !== pos.y) {
+		if (!this.firstInteractTile.equals(pos)
+			&& this.interactTiles.length == 1) {
+			// Dragged off a tile, but didn't drag far enough to add another tile to the group
+			this.endInteraction();
+			return;
+		}
+		if (this.interactTiles.length > 1) {
 			// this is a drag
-			this.dragTile(this.startPressedTile, pos);
+			this.dragTiles(this.firstInteractTile, pos, this.interactTiles);
 		}
 		else
 			this.clickTile(pos);
 
-		this.startPressedTile = null;
+		this.endInteraction();
+	}
+
+	endInteraction() {
+		this.firstInteractTile = null;
+		this.interactTiles.length = 0;
 	}
 
 	//#endregion Input Handlers

@@ -282,9 +282,9 @@ export namespace Anims {
 	export function destroyModels(
 		models: BatchedInstance[],
 		duration: number = Anims.BaseDur
-	) {
+	): GameAnim | undefined {
 		if (models.length < 1)
-			return null;
+			return;
 		return Anims.combined(models.map(
 			m => Anims.destroyModel(m, duration)
 		));

@@ -7,7 +7,7 @@ import { GameRenderer } from "../game/render/GameRenderer";
 import { Tile, TileType } from "../game/Tile";
 
 export const BuildTimestamp = __BUILD_TIMESTAMP__;
-export const BuildID = "bigger";
+export const BuildID = "brazen";
 
 export class GameView implements IView {
 	private ctx: AppCtx;
@@ -18,7 +18,7 @@ export class GameView implements IView {
 	private nextItemButton!: HTMLElement;
 
 	private game: GameState = new GameState();
-	private selectedItem: TileType | null = null;
+	private currItem: TileType | null = null;
 	private renderer: GameRenderer = this.game.renderer;
 
 	public constructor(ctx: AppCtx) {
@@ -68,6 +68,7 @@ export class GameView implements IView {
 
 		// Setup renderer
 		await this.renderer.setupAsync(this.boardElem, this.game);
+		await this.game.setupRendering();
 
 		// Get required elements
 		this.gameActionsElem = this.getElementOrThrow("#gameActions");
@@ -144,9 +145,9 @@ export class GameView implements IView {
 		// console.log(`clicked ${pos.name()}`);
 		const ctx = new CTX(this.game);
 		const tile = ctx.game.grid.get(pos);
-		if (this.selectedItem
-			&& ctx.canPlaceItem(tile, this.selectedItem)) {
-			ctx.placeItem(tile, this.selectedItem);
+		if (this.currItem
+			&& ctx.canPlaceItem(tile, this.currItem)) {
+			ctx.placeItem(tile, this.currItem);
 			ctx.finalize();
 
 			this.playNextAnim();
@@ -165,58 +166,66 @@ export class GameView implements IView {
 	}
 	dragTiles(start: P2, end: P2, positions: P2[]) {
 		// Try place objects on all dragged
-		if (!this.selectedItem) return; // no item to place
+		if (!this.currItem) return; // no item to place
 
 		const ctx = new CTX(this.game);
-		const item = this.selectedItem;
-		
+		const item = this.currItem;
+
 		const tiles: Tile[] = [];
 		for (const pos of positions) {
 			const tile = ctx.game.grid.get(pos);
 			tiles.push(tile);
 		}
 
-		if (ctx.tryPlaceItems(tiles, item)) {
-			ctx.finalize();
-			this.playNextAnim();
-			this.hoverTileEnd();
-		}
+		ctx.tryPlaceItems(tiles, item);
+		ctx.clearPlacementPreview();
+		ctx.finalize();
+		this.playNextAnim();
+		this.hoverTileEnd();
 	}
 	dragOverTile(pos: P2) {
 		if (this.interactTiles.find(p => p.equals(pos)))
 			return; // already in set
 
-		console.log(`drag over ${pos.name()}`);
-		this.interactTiles.push(pos);
+		const ctx = new CTX(this.game);
+		const tile = ctx.grid.get(pos);
+		if (ctx.canPlaceItem(tile, this.currItem)) {
+			this.interactTiles.push(pos);
+			ctx.updatePlacementPreview(this.currItem, this.interactTiles);
+		}
+		ctx.finalize();
 	}
 
 	private hoverPos: P2 | null = null;
 	hoverTileStart(pos: P2) {
 		this.hoverPos = pos;
-		const tile = this.game.grid.get(this.hoverPos);
-		const canInteract = this.selectedItem != null
-			&& this.game.canPlaceTile(tile, this.selectedItem);
-		this.renderer.hoverTile(tile, canInteract, this.selectedItem);
+
+		const ctx = new CTX(this.game);
+		ctx.updatePlacementPreview(this.currItem, this.hoverPos);
+		ctx.finalize();
 	}
 	hoverTileEnd() {
 		this.hoverPos = null;
-		this.renderer.hoverTile(null, false, null);
+
+		const ctx = new CTX(this.game);
+		ctx.clearHoverPlacement();
+		ctx.finalize();
 	}
 
 	selectNextItem = () => {
-		if (!this.selectedItem) {
+		if (!this.currItem) {
 			// Select the first item
-			this.selectedItem = this.game.items[0]?.type ?? null;
+			this.currItem = this.game.items[0]?.type ?? null;
 			this.updateItemDisplay();
 			return;
 		}
 
 		for (let i = 0; i < this.game.items.length; ++i) {
 			const item = this.game.items[i];
-			if (item!.type == this.selectedItem) {
+			if (item!.type == this.currItem) {
 				// Currently selecting this item. Move selection to next item
 				const nextIndex = (i + 1) % this.game.items.length;
-				this.selectedItem = this.game.items[nextIndex]!.type;
+				this.currItem = this.game.items[nextIndex]!.type;
 				this.updateItemDisplay();
 				return;
 			}
@@ -224,10 +233,10 @@ export class GameView implements IView {
 	}
 	selectItem = (index: number) => {
 		const item = this.game.items[index]?.type ?? null;
-		if (this.selectedItem == item)
-			this.selectedItem = null; // deselect item
+		if (this.currItem == item)
+			this.currItem = null; // deselect item
 		else
-			this.selectedItem = item;
+			this.currItem = item;
 		this.updateItemDisplay();
 	}
 
@@ -236,7 +245,7 @@ export class GameView implements IView {
 		if (this.hoverPos)
 			this.hoverTileStart(this.hoverPos);
 
-		this.nextItemButton.textContent = `${this.selectedItem?.name ?? '---'}`;
+		this.nextItemButton.textContent = `${this.currItem?.name ?? '---'}`;
 
 		let itemsHtml = /*html*/`<div class="game-act-icons">`;
 
@@ -247,7 +256,7 @@ export class GameView implements IView {
 			const imgPosX = 100 * (iconPos.x / iconCount);
 			const imgPosY = 100 * (iconPos.y / iconCount);
 
-			const selectedClass = item.type == this.selectedItem ? " game-act-icon-selected" : "";
+			const selectedClass = item.type == this.currItem ? " game-act-icon-selected" : "";
 			itemsHtml += /*html*/`
 	<div id="gameAct_${i}" class="game-act-icon${selectedClass}" style="--icon-x-pos: ${imgPosX}%; --icon-y-pos: ${imgPosY}%;"></div>
 `;
@@ -384,7 +393,7 @@ export class GameView implements IView {
 					// Ensure the drag is close enough to the middle of the tile to trigger the dragOverTile handler
 					const delta = this.worldPos!.subV(this.gridPos);
 					const dist = delta.len2();
-					const MaxDist = 0.4;
+					const MaxDist = 0.45;
 					if (dist <= MaxDist * MaxDist) {
 						this.dragOverTile(this.gridPos);
 					}

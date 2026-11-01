@@ -14,10 +14,10 @@ import { ModelCollection } from "./ModelCollection";
 import { color3, float3, quat4 } from "../utils/threeUtils";
 import { BatchedInstance } from "./render/BatchedInstance";
 import { Colors3 } from "../styles/colors";
-import { trs3D } from "../utils/renderUtils";
+import { getLineTransform, trs3D } from "../utils/renderUtils";
 
 const shouldLogTileDataUpdates = false;
-export const dev_ShouldAddDevVisualModels = true;
+export const dev_ShouldAddDevVisualModels = false;
 
 export class CTX {
 	public game: GameState;
@@ -115,6 +115,108 @@ export class CTX {
 
 	//#region Tile Actions
 
+	public updatePlacementPreview(item: TileType | null, tile: P2);
+	public updatePlacementPreview(item: TileType | null, tiles: P2[]);
+	public updatePlacementPreview(item: TileType | null, tiles: P2 | P2[]) {
+		if (tiles instanceof P2) {
+			const pos = tiles;
+			const tile = this.game.grid.get(pos);
+			const canInteract = item != null
+				&& this.game.canPlaceTile(tile, item);
+			this.hoverTile(tile, canInteract, item);
+		}
+		else {
+			// Multiple positions
+			if (this.game.cachedPlacementTiles.length == tiles.length
+				&& this.game.cachedPlacementTiles.every((item, i) => item.equals(tiles[i]!))) {
+				console.log("cached saved");
+				return; // Already equal
+			}
+
+			this.game.cachedPlacementTiles = [...tiles];
+			this.game.placementModels.destroyAll();
+
+			// Add the first tile
+			const zDepth = 0.06;
+			let prevPos: float3;
+			{
+				const pos = tiles[0]!;
+				const tile = this.grid.get(pos);
+				const canPlace = this.canPlaceItem(tile, item);
+				this.renderer.addModel(this.assets.model_LineCap,
+					prevPos = new float3(pos.x, pos.y, zDepth),
+					1,
+					canPlace ? Colors3.placementGood : Colors3.placementBad,
+					this.game.placementModels
+				);
+			}
+
+			// Add subsequent tiles
+			for (let i = 1; i < tiles.length; ++i) {
+				const pos = tiles[i]!;
+				const currPos = new float3(pos.x, pos.y, zDepth);
+				const tile = this.grid.get(pos);
+				const canPlace = this.canPlaceItem(tile, item);
+				this.renderer.addModel(this.assets.model_LineCap,
+					currPos,
+					0.7,
+					canPlace ? Colors3.placementGood : Colors3.placementBad,
+					this.game.placementModels
+				);
+
+				let lineTRS = getLineTransform(prevPos, currPos, 0.5);
+				this.renderer.addModel_TRS(
+					this.assets.model_LineSeg,
+					lineTRS.pos,
+					lineTRS.rot,
+					lineTRS.scale,
+					canPlace ? Colors3.placementGood : Colors3.placementBad,
+					this.game.placementModels
+				);
+
+				prevPos = currPos;
+			}
+		}
+	}
+	public clearHoverPlacement() {
+		this.hoverTile(null, false, null);
+	}
+	public clearPlacementPreview() {
+		this.hoverTile(null, false, null);
+		this.game.placementModels.destroyAll();
+	}
+	public hoverTile(tile: Tile | null,
+		canInteract: boolean,
+		potentialTile: TileType | null) {
+		if (!this.game.hoverSelectorModel)
+			return;
+
+		if (!tile || !tile.shouldDraw) {
+			this.game.hoverSelectorModel.setVisible(false);
+			this.game.hoverPreviewModel.setVisible(false);
+			return;
+		}
+
+		const pos = tile.pos;
+		this.game.hoverSelectorModel.setMesh(canInteract ? this.assets.model_HoverActive : this.assets.model_Hover);
+		this.game.hoverSelectorModel.setColor(canInteract ? Colors3.good : Colors3.bad);
+		this.game.hoverSelectorModel.setPosition(pos.x, pos.y, 0);
+		this.game.hoverSelectorModel.setVisible(true);
+
+		if (canInteract
+			&& potentialTile?.model
+			&& this.game.hoverPreviewModel) {
+			this.game.hoverPreviewModel.setMesh(this.assets.getModel(potentialTile.model));
+			this.game.hoverPreviewModel.setColor(Colors3.tilePreview);
+			this.game.hoverPreviewModel.setPosition(pos.x, pos.y, 0);
+			this.game.hoverPreviewModel.setScale(0.5, 0.5, 0.5);
+			this.game.hoverPreviewModel.setVisible(true);
+		}
+		else {
+			this.game.hoverPreviewModel.setVisible(false);
+		}
+	}
+
 	public tryInteractTile(tile: Tile) {
 		if (tile.type.interact) {
 			tile.type.interact(this, tile);
@@ -125,7 +227,7 @@ export class CTX {
 		return false;
 	}
 
-	public canPlaceItem(tile: Tile, item: TileType) { return this.game.canPlaceTile(tile, item); }
+	public canPlaceItem(tile: Tile, item: TileType | null) { return item != null && this.game.canPlaceTile(tile, item); }
 
 	public placeItem(tile: Tile, type: TileType) {
 		if (!this.canPlaceItem(tile, type))
@@ -160,8 +262,8 @@ export class CTX {
 		for (const tile of tiles) {
 			if (item.place) item.place(this, tile);
 			else this.replaceTile(tile, item);
+			this.regenVisuals();
 		}
-		this.regenVisuals();
 
 		// Apply rules
 		this.applyRules();
@@ -392,6 +494,11 @@ export class GameState {
 	public renderer: GameRenderer = new GameRenderer();
 	public get assets() { return this.renderer.assets; }
 
+	public hoverSelectorModel!: BatchedInstance;
+	public hoverPreviewModel!: BatchedInstance;
+	public placementModels: ModelCollection = new ModelCollection();
+	public cachedPlacementTiles: P2[] = [];
+
 	//#region Setup
 
 	constructor() {
@@ -399,6 +506,27 @@ export class GameState {
 			new Tile(new P2(-1, -1), Tiles.Empty),
 			pos => new Tile(pos, Tiles.Empty));
 		this.paths = new PathSystem(this);
+	}
+
+	public setupRendering() {
+		// Hover Models
+		{
+			this.hoverSelectorModel = this.renderer.addModel(
+				this.assets.model_Hover,
+				new float3(0, 0, 0),
+				1,
+				Colors3.bad)
+				.setName('hover selector');
+			this.hoverSelectorModel.setVisible(false);
+
+			this.hoverPreviewModel = this.renderer.addModel(
+				this.assets.model_Hover,
+				new float3(0, 0, 0),
+				1,
+				Colors3.white)
+				.setName('hover preview');
+			this.hoverPreviewModel.setVisible(false);
+		}
 	}
 
 	public setupGame() {

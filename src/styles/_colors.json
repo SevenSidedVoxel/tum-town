@@ -4,6 +4,10 @@
 
 	"good": "#57a83b",
 	"bad": "#9e3925",
+
+	"placementGood": "#336a27",
+	"placementBad": "#9e3925",
+
 	"bgDark": "#0d0c0a",
 	"bgPanel": "#151618",
 	"textHeader": "#c1c1cf",

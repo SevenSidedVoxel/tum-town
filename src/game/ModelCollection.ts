@@ -1,5 +1,5 @@
 import { Anims, GameAnim } from "./GameAnims";
-import { BatchedInstance } from "./render/GameRenderer";
+import { BatchedInstance } from "./render/BatchedInstance";
 
 
 export class ModelCollection implements Iterable<BatchedInstance> {
@@ -20,9 +20,15 @@ export class ModelCollection implements Iterable<BatchedInstance> {
 		}
 	}
 
-	destroyAll_anim(duration: number = Anims.BaseDur): GameAnim {
+	destroyAll_anim(duration: number = Anims.BaseDur): GameAnim | undefined {
 		const anim = Anims.destroyModels(this.models, duration);
 		this.reset();
 		return anim;
+	}
+
+	destroyAll() {
+		for (const model of this.models)
+			model.destroy();
+		this.reset();
 	}
 }

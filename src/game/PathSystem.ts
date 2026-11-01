@@ -196,7 +196,7 @@ export class PathSystem {
 			// TODO: Consider morphing the path
 			ctx.addAnim(path.models
 				.destroyAll_anim(0)
-				.delayed(Anims.BaseDur * 0.5));
+				?.delayed(Anims.BaseDur * 0.5));
 		}
 		else {
 			// Create a new path
@@ -405,7 +405,9 @@ export class PathSystem {
 
 		let anims: GameAnim[] = [];
 		for (const path of paths) {
-			anims.push(path.models.destroyAll_anim(duration));
+			const anim = path.models.destroyAll_anim(duration);
+			if (anim)
+				anims.push(anim);
 		}
 		paths.length = 0;
 

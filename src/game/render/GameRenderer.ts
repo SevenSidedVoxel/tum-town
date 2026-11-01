@@ -480,9 +480,6 @@ if(vShouldDepthShade > 0.0)
 	private game: GameState | undefined;
 
 	private gridSize: number = 0;
-	private hoverSelectorModel!: BatchedInstance;
-	private hoverPreviewModel!: BatchedInstance;
-
 	private ambientLight!: THREE.AmbientLight;
 
 	public async setupForGame(game: GameState) {
@@ -543,58 +540,7 @@ if(vShouldDepthShade > 0.0)
 			}
 		}
 
-		// Hover Model
-		{
-			this.hoverSelectorModel = this.addModel(
-				this.assets.model_Hover,
-				new float3(0, 0, 0),
-				1,
-				Colors3.bad)
-				.setName('hover selector');
-			this.hoverSelectorModel.setVisible(false);
-
-			this.hoverPreviewModel = this.addModel(
-				this.assets.model_Hover,
-				new float3(0, 0, 0),
-				1,
-				Colors3.white)
-				.setName('hover preview');
-			this.hoverPreviewModel.setVisible(false);
-		}
-
 		this.scene.add(this.drawBatch);
-	}
-
-	public hoverTile(tile: Tile | null,
-		canInteract: boolean,
-		potentialTile: TileType | null) {
-		if (!this.hoverSelectorModel)
-			return;
-
-		if (!tile || !tile.shouldDraw) {
-			this.hoverSelectorModel.setVisible(false);
-			this.hoverPreviewModel?.setVisible(false);
-			return;
-		}
-
-		const pos = tile.pos;
-		this.hoverSelectorModel.setMesh(canInteract ? this.assets.model_HoverActive : this.assets.model_Hover);
-		this.hoverSelectorModel.setColor(canInteract ? Colors3.good : Colors3.bad);
-		this.hoverSelectorModel.setPosition(pos.x, pos.y, 0);
-		this.hoverSelectorModel.setVisible(true);
-
-		if (canInteract
-			&& potentialTile?.model
-			&& this.hoverPreviewModel) {
-			this.hoverPreviewModel.setMesh(this.assets.getModel(potentialTile.model));
-			this.hoverPreviewModel.setColor(Colors3.tilePreview);
-			this.hoverPreviewModel.setPosition(pos.x, pos.y, 0);
-			this.hoverPreviewModel.setScale(0.5, 0.5, 0.5);
-			this.hoverPreviewModel.setVisible(true);
-		}
-		else {
-			this.hoverPreviewModel?.setVisible(false);
-		}
 	}
 
 	public draw(frame: Frame) {

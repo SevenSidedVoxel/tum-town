@@ -114,6 +114,24 @@ export function makeRules(): Rule[] {
 }
 
 function makeForestRules(rules: Rule[]) {
+	rules.push(new Rule("Make Xmas Tree",
+		{
+			c: Tiles.BigTree,
+			u: Tiles.House1,
+			l: Tiles.House1,
+			r: Tiles.House1,
+			d: Tiles.House1,
+		},
+		(ctx, area, rot) => {
+			ctx.mergeTilesInto(
+				area.c,
+				[area.u, area.l, area.r, area.d,],
+				Tiles.XmasTree
+			);
+
+			ctx.addScore(area.c, 20);
+		},
+		MatchFlags.None));
 	rules.push(new Rule("Make Big Tree",
 		{
 			c: Tiles.Tree,

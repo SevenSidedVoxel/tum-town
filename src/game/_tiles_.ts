@@ -4,10 +4,11 @@ import { Anims } from "./GameAnims";
 import { CTX } from "./GameState";
 import { P2 } from "./P2";
 import { Pathing } from "./PathSystem";
-import { RenderAssets, Z_GroundDepth, Z_PathDepth } from "./render/GameRenderer";
+import { Z_GroundDepth, Z_PathDepth } from "./render/GameRenderer";
 import { calcFillTileType } from './render/FillTileTypes';
 import { RandomSlice } from "./SeededRandom";
 import { Tile, TileType } from "./Tile";
+import { RenderAssets } from "./render/RenderAssets";
 
 export const Tiles = {
 	Any: { name: "any" },
@@ -287,6 +288,37 @@ export const Tiles = {
 	BigTree: {
 		name: "big tree",
 		model: a => a.model_BigTree,
+		color: Colors3.tileTree1,
+		regen(ctx, tile) {
+			if (tile.firstTimeBuild()) {
+				const rng = tile.rng(ctx);
+				const centerPos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
+
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					ctx.assets.getModel(this.model),
+					new color3(this.color),
+					centerPos,
+					new float3().setScalar(rng.nextF(0.9, 1)),
+					Utils3.rotZRad(tile.rot ?? 0),
+				);
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					ctx.assets.model_GrassPatch,
+					Colors3.tileTree1,
+					centerPos,
+					new float3().setScalar(rng.nextF(0.9, 1)),
+					Utils3.rotZDeg(rng.nextI(0, 3) * 90),
+				);
+			}
+		},
+	},
+	XmasTree: {
+		name: "xmas tree",
+		model: a => a.model_XmasTree,
 		color: Colors3.tileTree1,
 		regen(ctx, tile) {
 			if (tile.firstTimeBuild()) {

@@ -2,12 +2,9 @@ import { IView, AppCtx } from "../AppCtx";
 import { P2 } from "../game/P2";
 import { Frame } from "../game/Frame";
 import { GameAnim } from "../game/GameAnims";
-import { CTX, GameState, dev_ShouldAddDevVisualModels } from "../game/GameState";
+import { BuildID, BuildTimestamp, CTX, GameState, dev_ShouldAddDevVisualModels } from "../game/GameState";
 import { GameRenderer } from "../game/render/GameRenderer";
 import { Tile, TileType } from "../game/Tile";
-
-export const BuildTimestamp = __BUILD_TIMESTAMP__;
-export const BuildID = "brazen";
 
 export class GameView implements IView {
 	private ctx: AppCtx;

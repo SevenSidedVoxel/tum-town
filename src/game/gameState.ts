@@ -16,6 +16,9 @@ import { BatchedInstance } from "./render/BatchedInstance";
 import { Colors3 } from "../styles/colors";
 import { getLineTransform, trs3D } from "../utils/renderUtils";
 
+export const BuildTimestamp = __BUILD_TIMESTAMP__;
+export const BuildID = "blooming";
+
 const shouldLogTileDataUpdates = false;
 export const dev_ShouldAddDevVisualModels = false;
 

@@ -206,9 +206,9 @@ if(vShouldDepthShade > 0.0)
 
 	private icons = {
 		XOffset: -1000,
-		FullRenderSize: 1024,
+		FullRenderSize: 512,
 		IconRenderSize: 128,
-		IconCount: 8,
+		IconCount: 4,
 
 		canvas: null! as HTMLCanvasElement,
 		ctx: null as CanvasRenderingContext2D | null,
@@ -231,13 +231,14 @@ if(vShouldDepthShade > 0.0)
 	};
 
 	private async setupIconRendering() {
-		const size = this.icons.FullRenderSize;
+		const fullSize = this.icons.FullRenderSize;
 		const iconSize = this.icons.IconRenderSize;
+		const iconCount = this.icons.IconCount;
 
 		// Create the canvas
 		const canvas = this.icons.canvas = document.createElement('canvas');
-		canvas.width = size;
-		canvas.height = size;
+		canvas.width = fullSize;
+		canvas.height = fullSize;
 		this.icons.tmpCanvas = document.createElement('canvas');
 		this.icons.tmpCanvas.width = iconSize;
 		this.icons.tmpCanvas.height = iconSize;
@@ -282,8 +283,8 @@ if(vShouldDepthShade > 0.0)
 
 		// Create the icon reserve
 		this.icons.freeIcons.length = 0;
-		for (let y = 0; y < 8; ++y) {
-			for (let x = 0; x < 8; ++x) {
+		for (let y = 0; y < iconCount; ++y) {
+			for (let x = 0; x < iconCount; ++x) {
 				this.icons.freeIcons.push(new P2(x, y));
 			}
 		}

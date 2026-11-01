@@ -55,7 +55,7 @@ export class GameView implements IView {
 			</div>
 			<div id="gameActionOptions" class="game-actions-row"></div>
 			<button id="nextItemButton"></button>
-			<!--<div class="game-icons-full-preview"></div>-->
+			<div class="game-icons-full-preview"></div>
 		</section>
 	</div>
 </div>
@@ -246,7 +246,7 @@ export class GameView implements IView {
 
 		let itemsHtml = /*html*/`<div class="game-act-icons">`;
 
-		const iconCount = 8 - 1;
+		const iconCount = 4 - 1;
 		for (let i = 0; i < this.game.items.length; ++i) {
 			const item = this.game.items[i]!;
 			const iconPos = item.icon.iconPos;

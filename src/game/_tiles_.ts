@@ -170,8 +170,10 @@ export const Tiles = {
 			const adj = ctx.grid.getAdj8(tile.pos);
 			const treeCenter = new P2(0, 0);
 			const forestCenter = new P2(0, 0);
+			const avoidForce = new P2(0, 0);
 			let treeCount = 0;
 			let forestCount = 0;
+			let avoidCount = 0;
 			function addTileWeight(tile: Tile, x: number, y: number) {
 				let weight = Math.abs(x) == Math.abs(y) ? 1.25 : 1;
 
@@ -182,6 +184,11 @@ export const Tiles = {
 				else if (tile.type == Tiles.Forest) {
 					forestCenter.addXY(x * weight, y * weight);
 					forestCount++;
+				} else if (tile.type == Tiles.House2
+					|| tile.type == Tiles.House3) {
+					weight *= -0.5;
+					avoidForce.addXY(x * weight, y * weight);
+					avoidCount++;
 				}
 			}
 			addTileWeight(adj.ul, -1, +1);
@@ -194,8 +201,9 @@ export const Tiles = {
 			addTileWeight(adj.dr, +1, -1);
 			let center = new P2(0, 0);
 			if (forestCount > 0) {
-				center = forestCenter;
-				center.mulS(1.0 / forestCount);
+				const count = forestCount + avoidCount;
+				center = forestCenter.addV(avoidForce);
+				center.mulS(1.0 / count);
 				center.mulXY(0.25, 0.25);
 				center.clampXY(
 					-1, 1,
@@ -203,8 +211,9 @@ export const Tiles = {
 				);
 			}
 			else if (treeCount > 0) {
-				center = treeCenter;
-				center.mulS(1.0 / treeCount);
+				const count = treeCount + avoidCount;
+				center = treeCenter.addV(avoidForce);
+				center.mulS(1.0 / count);
 				center.mulXY(0.25, 0.25);
 				center.clampXY(
 					-1, 1,

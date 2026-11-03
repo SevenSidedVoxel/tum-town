@@ -241,16 +241,6 @@
   padding: 5px;
 }
 
-.game-icons-full-preview {
-  aspect-ratio: 1;
-  background-color: #202020;
-  background-image: var(--img-game-icons);
-  background-position: 0 0;
-  background-repeat: no-repeat;
-  background-size: 100%;
-  width: 100%;
-}
-
 .game-act-icons {
   display: flex;
   flex-direction: row;
@@ -263,10 +253,9 @@
 
 .game-act-icon {
   aspect-ratio: 1;
-  background-image: var(--img-game-icons);
-  background-size: var(--img-game-icons-full-scale);
-  background-position: var(--icon-x-pos) var(--icon-y-pos);
+  background-position: 0 0;
   background-repeat: no-repeat;
+  background-size: 100%;
   background-color: var(--col-bgBtn);
   border: 10px solid var(--col-bgBtn);
   border-radius: 10px;

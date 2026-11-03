@@ -2,8 +2,9 @@ import { IView, AppCtx } from "../AppCtx";
 import { P2 } from "../game/P2";
 import { Frame } from "../game/Frame";
 import { GameAnim } from "../game/GameAnims";
-import { BuildID, BuildTimestamp, CTX, GameState, dev_ShouldAddDevVisualModels } from "../game/GameState";
+import { BuildID, BuildTimestamp, CTX, GameState } from "../game/GameState";
 import { GameRenderer } from "../game/render/GameRenderer";
+import { dev_ShouldAddDevVisualModels, addDevVisualModels } from "../game/render/RenderAssets";
 import { Tile, TileType } from "../game/Tile";
 
 export class GameView implements IView {
@@ -55,7 +56,6 @@ export class GameView implements IView {
 			</div>
 			<div id="gameActionOptions" class="game-actions-row"></div>
 			<button id="nextItemButton"></button>
-			<div class="game-icons-full-preview"></div>
 		</section>
 	</div>
 </div>
@@ -80,7 +80,7 @@ export class GameView implements IView {
 		// Dev: Add Design Models
 		if (dev_ShouldAddDevVisualModels) {
 			let ctx = new CTX(this.game);
-			ctx.addDevVisualModels();
+			addDevVisualModels(ctx);
 			ctx.finalize();
 
 			this.playNextAnim();
@@ -186,10 +186,21 @@ export class GameView implements IView {
 
 		const ctx = new CTX(this.game);
 		const tile = ctx.grid.get(pos);
-		if (ctx.canPlaceItem(tile, this.currItem)) {
-			this.interactTiles.push(pos);
-			ctx.updatePlacementPreview(this.currItem, this.interactTiles);
+		if (!ctx.game.isPlayablePos(pos))
+			return; // Position is outside playable boundary
+
+		const lastPos = this.interactTiles[this.interactTiles.length - 1];
+		if (lastPos) {
+			const delta = lastPos.clone().subV(pos).abs();
+			if (delta.x > 1 || delta.y > 1)
+				return; // Dragging jumped positions
+			if (delta.x == 0 && delta.y == 0)
+				return; // Position was invalid last time, will still be invalid
+
 		}
+
+		this.interactTiles.push(pos);
+		ctx.updatePlacementPreview(this.currItem, this.interactTiles);
 		ctx.finalize();
 	}
 
@@ -246,16 +257,11 @@ export class GameView implements IView {
 
 		let itemsHtml = /*html*/`<div class="game-act-icons">`;
 
-		const iconCount = 4 - 1;
 		for (let i = 0; i < this.game.items.length; ++i) {
 			const item = this.game.items[i]!;
-			const iconPos = item.icon.iconPos;
-			const imgPosX = 100 * (iconPos.x / iconCount);
-			const imgPosY = 100 * (iconPos.y / iconCount);
-
 			const selectedClass = item.type == this.currItem ? " game-act-icon-selected" : "";
 			itemsHtml += /*html*/`
-	<div id="gameAct_${i}" class="game-act-icon${selectedClass}" style="--icon-x-pos: ${imgPosX}%; --icon-y-pos: ${imgPosY}%;"></div>
+	<div id="gameAct_${i}" class="game-act-icon${selectedClass}" style="background-image: var(--img-icon-${item.icon.iconId});"></div>
 `;
 		}
 
@@ -418,6 +424,9 @@ export class GameView implements IView {
 	}
 
 	startPressTile(coord: P2) {
+		if (this.firstInteractTile != null)
+			this.endPressTile(this.firstInteractTile);
+
 		this.firstInteractTile = coord;
 		this.interactTiles.push(this.firstInteractTile);
 	}

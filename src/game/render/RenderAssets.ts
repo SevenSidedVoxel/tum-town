@@ -1,5 +1,58 @@
 import * as THREE from 'three';
 import { GLTF } from "three/examples/jsm/Addons.js";
+import { CTX } from '../GameState';
+import { Tiles } from '../_tiles_';
+
+export const dev_ShouldAddDevVisualModels = false;
+export function addDevVisualModels(ctx: CTX) {
+	// Dev: Add various models for visual development
+	console.warn("Adding Dev Visual Models");
+	ctx.startCombinedAnim();
+
+	addRotations(ctx, 1, 8, Tiles.House2);
+	addRotations(ctx, 5, 8, Tiles.House3);
+
+	addRotations(ctx, 1, 7, Tiles.Foundation1);
+	
+	addRotations(ctx, 1, 6, Tiles.House1);
+	addRotations(ctx, 5, 6, Tiles.Sawmill);
+	
+	addTile(ctx, 4, 5, Tiles.Tree);
+	addTile(ctx, 5, 5, Tiles.Tree);
+	addTile(ctx, 6, 5, Tiles.Forest);
+	addTile(ctx, 7, 5, Tiles.Forest);
+	addTile(ctx, 8, 5, Tiles.BigTree);
+	
+	addRotations(ctx, 1, 4, Tiles.Path);
+	addTile(ctx, 5, 4, Tiles.Fountain);
+	addTile(ctx, 6, 4, Tiles.TownBell);
+
+	addTile(ctx, 1, 3, Tiles.Water);
+	addTile(ctx, 2, 3, Tiles.Water);
+	addTile(ctx, 3, 3, Tiles.Water);
+	addTile(ctx, 4, 3, Tiles.Water);
+	addTile(ctx, 5, 3, Tiles.Water);
+	addTile(ctx, 1, 2, Tiles.Water);
+	addTile(ctx, 2, 2, Tiles.Water);
+	addTile(ctx, 4, 2, Tiles.Water);
+	addTile(ctx, 4, 1, Tiles.Water);
+	addTile(ctx, 3, 2, Tiles.Path);
+	addTile(ctx, 5, 2, Tiles.Path);
+
+	ctx.applyRules();
+	ctx.endAndAddCombinedAnim();
+
+	function addRotations(self, xStart, y, tileType) {
+		self.replaceTile(self.game.grid.get(xStart++, y), tileType, 0);
+		self.replaceTile(self.game.grid.get(xStart++, y), tileType, 90);
+		self.replaceTile(self.game.grid.get(xStart++, y), tileType, 180);
+		self.replaceTile(self.game.grid.get(xStart++, y), tileType, 270);
+	}
+
+	function addTile(self, x, y, tileType) {
+		self.replaceTile(self.game.grid.get(x, y), tileType, 0);
+	}
+}
 
 export class RenderAssets {
 	public texPalette: THREE.Texture | undefined;
@@ -25,6 +78,7 @@ export class RenderAssets {
 
 	public model_RoadStone!: number;
 	public model_Fountain!: number;
+	public model_TownBell!: number;
 
 	public model_GrassPatch!: number;
 	public model_Tree1!: number;
@@ -37,7 +91,15 @@ export class RenderAssets {
 	public model_Bridge!: number;
 
 	loadModels(gltf: GLTF, batch: THREE.BatchedMesh) {
-		this.model_Missing = batch.addGeometry(new THREE.BoxGeometry(0.5, 0.5, 0.5));
+		{
+			const missingGeom = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+			const uvs = missingGeom.attributes.uv!;
+			for (let i = 0; i < uvs.count; i++) {
+				uvs.setXY(i, 0, 0);
+			}
+			this.model_Missing = batch.addGeometry(missingGeom);
+		}
+
 		this.model_LineSeg = addGeom(this, 'line_seg');
 		this.model_LineCap = addGeom(this, 'line_cap');
 
@@ -55,6 +117,7 @@ export class RenderAssets {
 		this.model_PathGround_Large = addGeom(this, 'ground_l');
 
 		this.model_Fountain = addGeom(this, 'fountain');
+		this.model_TownBell = addGeom(this, 'town_bell');
 
 		this.model_GrassPatch = addGeom(this, 'grass.001');
 		this.model_SingleTrees = [

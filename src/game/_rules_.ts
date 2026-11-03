@@ -1,4 +1,4 @@
-import { Rule, MatchFlags } from "./Rule";
+import { Rule, RuleRotations } from "./Rule";
 import { pickLastActIndex } from "./Tile";
 import { Tiles } from "./_tiles_";
 
@@ -6,60 +6,8 @@ import { Tiles } from "./_tiles_";
 export function makeRules(): Rule[] {
 	let rules: Rule[] = [];
 
-	rules.push(new Rule("Make Big-House",
-		{
-			c: Tiles.House2,
-			u: Tiles.House1,
-			d: Tiles.House1,
-			l: Tiles.House1,
-			r: Tiles.House1,
-		},
-		(ctx, area, rot) => {
-			ctx.mergeTilesInto(
-				area.c,
-				[area.u, area.d, area.l, area.r],
-				Tiles.House3,
-				area.c.rot);
-			ctx.addScore(area.c, 4);
-			ctx.addPop(area.c, 4);
-		},
-		MatchFlags.None));
-	rules.push(new Rule("Make L-House",
-		{
-			c: Tiles.House1,
-			u: Tiles.House1,
-			l: Tiles.House1,
-			d: Tiles.House1,
-		},
-		(ctx, area, rot) => {
-			ctx.mergeTilesInto(
-				area.c,
-				[area.u, area.d, area.l],
-				Tiles.House2,
-				rot);
-			ctx.addScore(area.c, 3);
-		},
-		MatchFlags.Rotate4));
-	rules.push(new Rule("Make Square-House",
-		{
-			c: Tiles.House1,
-			u: Tiles.House1,
-			l: Tiles.House1,
-			ul: Tiles.House1,
-		},
-		(ctx, area, rot) => {
-			const tiles = [area.c, area.u, area.ul, area.l];
-			const lastTile = pickLastActIndex(tiles);
-
-			ctx.mergeTilesInto(
-				lastTile,
-				tiles.filter(t => t != lastTile),
-				Tiles.Factory1,
-				rot);
-			ctx.addScore(area.c, 3);
-		},
-		MatchFlags.None));
-
+	makeHouseRules(rules);
+	makeTownRules(rules);
 	makeForestRules(rules);
 	makeSawmillRules(rules);
 
@@ -81,7 +29,9 @@ export function makeRules(): Rule[] {
 			ctx.addScore(lastTile, 4);
 			ctx.addNat(lastTile, 1);
 		},
-		MatchFlags.None));
+		{
+			rotations: RuleRotations.None
+		}));
 
 	rules.push(new Rule("Make Bridge",
 		{
@@ -95,7 +45,9 @@ export function makeRules(): Rule[] {
 			ctx.replaceTile(area.c, Tiles.Bridge);
 			ctx.addScore(area.c, 2);
 		},
-		MatchFlags.Rotate1));
+		{
+			rotations: RuleRotations.Rotate1
+		}));
 	rules.push(new Rule("Make Bridge",
 		{
 			c: Tiles.Path,
@@ -108,7 +60,9 @@ export function makeRules(): Rule[] {
 			ctx.replaceTile(area.c, Tiles.Bridge);
 			ctx.addScore(area.c, 2);
 		},
-		MatchFlags.Rotate1));
+		{
+			rotations: RuleRotations.Rotate1
+		}));
 
 	return rules;
 }
@@ -131,7 +85,9 @@ function makeForestRules(rules: Rule[]) {
 
 			ctx.addScore(area.c, 20);
 		},
-		MatchFlags.None));
+		{
+			rotations: RuleRotations.None
+		}));
 	rules.push(new Rule("Make Big Tree",
 		{
 			c: Tiles.Tree,
@@ -158,7 +114,9 @@ function makeForestRules(rules: Rule[]) {
 			ctx.addScore(area.c, 16);
 			ctx.addNat(area.c, 8);
 		},
-		MatchFlags.None));
+		{
+			rotations: RuleRotations.None
+		}));
 	rules.push(new Rule("Make Big Tree in Forest",
 		{
 			c: Tiles.Forest,
@@ -176,7 +134,9 @@ function makeForestRules(rules: Rule[]) {
 			ctx.addScore(area.c, 16);
 			ctx.addNat(area.c, 8);
 		},
-		MatchFlags.None));
+		{
+			rotations: RuleRotations.None
+		}));
 
 	rules.push(new Rule("Make Forest",
 		{
@@ -199,7 +159,9 @@ function makeForestRules(rules: Rule[]) {
 			ctx.addScore(lastTile, 4);
 			ctx.addNat(lastTile, 2);
 		},
-		MatchFlags.None));
+		{
+			rotations: RuleRotations.None
+		}));
 
 	rules.push(new Rule("Forest Growth L",
 		{
@@ -213,7 +175,9 @@ function makeForestRules(rules: Rule[]) {
 			ctx.addScore(area.c, 4);
 			ctx.addNat(area.c, 2);
 		},
-		MatchFlags.Rotate4));
+		{
+			rotations: RuleRotations.Rotate4
+		}));
 
 	rules.push(new Rule("Forest Growth T",
 		{
@@ -227,13 +191,95 @@ function makeForestRules(rules: Rule[]) {
 			ctx.addScore(area.c, 4);
 			ctx.addNat(area.c, 2);
 		},
-		MatchFlags.Rotate4));
+		{
+			rotations: RuleRotations.Rotate4
+		}));
+}
+
+function makeHouseRules(rules: Rule[]) {
+	rules.push(new Rule("Make Big-House",
+		{
+			c: Tiles.House2,
+			u: Tiles.House1,
+			d: Tiles.House1,
+			l: Tiles.House1,
+			r: Tiles.House1,
+		},
+		(ctx, area, rot) => {
+			ctx.mergeTilesInto(
+				area.c,
+				[area.u, area.d, area.l, area.r],
+				Tiles.House3,
+				area.c.rot);
+			ctx.addScore(area.c, 4);
+			ctx.addPop(area.c, 4);
+		},
+		{
+			rotations: RuleRotations.None
+		}));
+	rules.push(new Rule("Make L-House",
+		{
+			c: Tiles.House1,
+			u: Tiles.House1,
+			l: Tiles.House1,
+			d: Tiles.House1,
+		},
+		(ctx, area, rot) => {
+			ctx.mergeTilesInto(
+				area.c,
+				[area.u, area.d, area.l],
+				Tiles.House2,
+				rot);
+			ctx.addScore(area.c, 3);
+		},
+		{
+			rotations: RuleRotations.Rotate4
+		}));
+	rules.push(new Rule("Make Square-House",
+		{
+			c: Tiles.House1,
+			u: Tiles.House1,
+			l: Tiles.House1,
+			ul: Tiles.House1,
+		},
+		(ctx, area, rot) => {
+			const tiles = [area.c, area.u, area.ul, area.l];
+			const lastTile = pickLastActIndex(tiles);
+
+			ctx.mergeTilesInto(
+				lastTile,
+				tiles.filter(t => t != lastTile),
+				Tiles.Foundation1,
+				rot);
+			ctx.addScore(area.c, 3);
+		},
+		{
+			rotations: RuleRotations.None
+		}));
+}
+
+function makeTownRules(rules: Rule[]) {
+		rules.push(new Rule("Make Town Bell",
+		{
+			c: Tiles.Foundation1,
+			u: Tiles.Path,
+			l: Tiles.Path,
+			r: Tiles.Path,
+			d: Tiles.Path,
+		},
+		(ctx, area, rot) => {
+			ctx.replaceTile(area.c, Tiles.TownBell, rot);
+			ctx.addScore(area.c, 4);
+		},
+		{
+			rotations: RuleRotations.None
+		}));
 }
 
 function makeSawmillRules(rules: Rule[]) {
 	rules.push(new Rule("Make Sawmill",
 		{
-			c: Tiles.Factory1,
+			c: Tiles.Foundation1,
 			u: Tiles.Forest,
 			l: Tiles.Forest,
 		},
@@ -241,5 +287,7 @@ function makeSawmillRules(rules: Rule[]) {
 			ctx.replaceTile(area.c, Tiles.Sawmill, rot);
 			ctx.addScore(area.c, 4);
 		},
-		MatchFlags.Rotate4));
+		{
+			rotations: RuleRotations.Rotate4
+		}));
 }

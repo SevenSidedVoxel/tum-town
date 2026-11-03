@@ -9,7 +9,7 @@ import { CTX, GameState } from '../GameState';
 
 import '../../utils/domUtils';
 import '../../utils/threeUtils';
-import { Tile, TileIcon as IconInfo, TileType } from '../Tile';
+import { Tile, TileIcon as IconModelInfo, TileType } from '../Tile';
 import { ModelCollection } from "../ModelCollection";
 import { BatchedMesh } from 'three';
 import { Colors, Colors3 } from '../../styles/colors';
@@ -206,9 +206,7 @@ if(vShouldDepthShade > 0.0)
 
 	private icons = {
 		XOffset: -1000,
-		FullRenderSize: 512,
 		IconRenderSize: 128,
-		IconCount: 4,
 
 		canvas: null! as HTMLCanvasElement,
 		ctx: null as CanvasRenderingContext2D | null,
@@ -220,25 +218,26 @@ if(vShouldDepthShade > 0.0)
 		scene: null! as THREE.Scene,
 		camera: null! as THREE.Camera,
 		icons: [] as ModelIcon[],
-		freeIcons: [] as P2[],
+
+		reuseIconIds: [] as number[],
+		nextIconId: 0 as number,
+
 		modelIcon: null! as BatchedInstance,
 		loadingIcon: null! as ModelIcon,
 
 		pixelBuffer: null! as Uint8Array,
 		imageData: null! as ImageData,
 		imgDataURL: null! as string,
-		styleTag: null! as HTMLStyleElement,
 	};
+	public get iconImgSize(): number { return this.icons.IconRenderSize; }
 
 	private async setupIconRendering() {
-		const fullSize = this.icons.FullRenderSize;
 		const iconSize = this.icons.IconRenderSize;
-		const iconCount = this.icons.IconCount;
 
 		// Create the canvas
 		const canvas = this.icons.canvas = document.createElement('canvas');
-		canvas.width = fullSize;
-		canvas.height = fullSize;
+		canvas.width = iconSize;
+		canvas.height = iconSize;
 		this.icons.tmpCanvas = document.createElement('canvas');
 		this.icons.tmpCanvas.width = iconSize;
 		this.icons.tmpCanvas.height = iconSize;
@@ -247,10 +246,6 @@ if(vShouldDepthShade > 0.0)
 		const ctx = this.icons.ctx = canvas.getContext('2d', { alpha: true });
 		this.icons.tmpCtx = this.icons.tmpCanvas.getContext('2d', { alpha: true });
 		if (ctx == null) return;
-
-		// Create the style tag to hold the resulting image data URL
-		this.icons.styleTag = document.createElement('style');
-		document.head.appendChild(this.icons.styleTag);
 
 		// Preallocate an image from the context
 		// The render target will be copied to this image each frame
@@ -282,12 +277,8 @@ if(vShouldDepthShade > 0.0)
 			Colors3.white);
 
 		// Create the icon reserve
-		this.icons.freeIcons.length = 0;
-		for (let y = 0; y < iconCount; ++y) {
-			for (let x = 0; x < iconCount; ++x) {
-				this.icons.freeIcons.push(new P2(x, y));
-			}
-		}
+		this.icons.nextIconId = 0;
+		this.icons.reuseIconIds.length = 0;
 
 		this.icons.loadingIcon = this.addModelIcon(this.assets.model_Missing, Colors3.white);
 	}
@@ -302,7 +293,6 @@ if(vShouldDepthShade > 0.0)
 		this.updateIcons(frame);
 
 		const iconSize = icons.IconRenderSize;
-		const iconRenderCount = icons.IconCount;
 
 		// Render to the offscreen target
 		draw.setRenderTarget(icons.renderTarget);
@@ -313,14 +303,11 @@ if(vShouldDepthShade > 0.0)
 			if (!icon.updateIcon) continue;
 			icon.updateIcon = false;
 
-			const iconCanvasX = this.icons.FullRenderSize * (icon.iconPos.x / iconRenderCount);
-			const iconCanvasY = this.icons.FullRenderSize * (icon.iconPos.y / iconRenderCount);
-
 			// Update model
 			icons.modelIcon.setMesh(icon.modelID);
 			icons.modelIcon.setColor(icon.color);
-			icons.modelIcon.rotation.setFromAxisAngle(ZAxis, degToRad(icon.iconInfo?.baseDegZ ?? 0));
-			icons.modelIcon.scale.setScalar(icon.iconInfo?.baseSize ?? 1);
+			icons.modelIcon.rotation.setFromAxisAngle(ZAxis, degToRad(icon.modelPositioning?.baseDegZ ?? 0));
+			icons.modelIcon.scale.setScalar(icon.modelPositioning?.baseSize ?? 1);
 			icons.modelIcon.updateMatrix();
 			icons.modelIcon.setVisible(true);
 
@@ -341,37 +328,42 @@ if(vShouldDepthShade > 0.0)
 
 			// Draw the temp canvas to the canvas (flipping the y-axis)
 			const ctx = icons.ctx;
-			ctx.clearRect(iconCanvasX, iconCanvasY, iconSize, iconSize);
+			ctx.clearRect(0, 0, iconSize, iconSize);
 			ctx.save();
-			ctx.translate(iconCanvasX, iconCanvasY + iconSize);
+			ctx.translate(0, iconSize);
 			ctx.scale(1, -1);
 			ctx.drawImage(icons.tmpCanvas, 0, 0);
 			ctx.restore();
+
+			// Convert the canvas into a data URL
+			icon.imgDataURL = icons.canvas.toDataURL('image/png');
+			icon.imgStyleElement.textContent = `:root { --img-icon-${icon.iconId}: url(${icon.imgDataURL}); }`;
 		}
 
 		// Restore render
 		draw.setRenderTarget(null); // Reset back to main canvas/screen
 		this.scene.background = prevBack;
 		icons.modelIcon.setVisible(false);
-
-		// Convert the canvas into a data URL
-		const dataUrl = icons.canvas.toDataURL('image/png');
-		this.icons.styleTag.textContent = `:root { --img-game-icons: url(${dataUrl}); --img-game-icons-full-scale: ${iconRenderCount * 100}%; }`;
 	}
 
-	public addModelIcon(modelID: number, color: color3, iconInfo: IconInfo | undefined = undefined) {
-		if (this.icons.freeIcons.length < 1)
-			return this.icons.loadingIcon; // no more free icons
+	public addModelIcon(modelID: number, color: color3, iconInfo: IconModelInfo | undefined = undefined) {
+		const iconId = this.icons.reuseIconIds.length > 0
+			? this.icons.reuseIconIds.pop()!
+			: this.icons.nextIconId++;
+		const icon = new ModelIcon(iconId, modelID, color, iconInfo);
 
-		const iconPos = this.icons.freeIcons.pop()!;
-		const icon = new ModelIcon(iconPos, modelID, color, iconInfo);
+		// Create the style tag to hold the resulting image data URL
+		icon.imgStyleElement = document.createElement('style');
+		document.head.appendChild(icon.imgStyleElement);
+
 		this.icons.icons.push(icon);
-
 		return icon;
 	}
 
 	public freeIcon(icon: ModelIcon) {
-		this.icons.freeIcons.push(icon.iconPos);
+		document.head.removeChild(icon.imgStyleElement);
+		icon.imgStyleElement = null!;
+		this.icons.reuseIconIds.push(icon.iconId);
 	}
 
 	//#endregion Icon Rendering
@@ -399,14 +391,14 @@ if(vShouldDepthShade > 0.0)
 			this.ambientLight = new THREE.AmbientLight(0xFFFFFF, 2);
 			this.scene.add(this.ambientLight);
 
-			const sun = new THREE.DirectionalLight(0xefcdc7, 2);
+			const sun = new THREE.DirectionalLight(0xefcdc7, 1);
 			sun.castShadow = true;
 			sun.position.set(10, 20, 20);
 			sun.target.position.set(0, 0, 0);
 			sun.shadow.mapSize.width = 2048;
 			sun.shadow.mapSize.height = 2048;
 			sun.shadow.bias = 0.00013;
-			sun.shadow.camera.near = 1;
+			sun.shadow.camera.near = 10;
 			sun.shadow.camera.far = 100;
 			sun.shadow.camera.left = -10;
 			sun.shadow.camera.right = 10;
@@ -598,16 +590,20 @@ if(vShouldDepthShade > 0.0)
 }
 
 export class ModelIcon {
-	public iconPos: P2;
+	public iconId: number;
+
 	public modelID: number;
 	public color: color3;
-	public iconInfo: IconInfo | undefined;
-	public updateIcon: boolean = true;
+	public modelPositioning: IconModelInfo | undefined;
 
-	constructor(iconPos: P2, modelID: number, color: color3, iconInfo: IconInfo | undefined) {
-		this.iconPos = iconPos;
+	public updateIcon: boolean = true;
+	public imgDataURL: string = '';
+	public imgStyleElement!: HTMLElement;
+
+	constructor(iconId: number, modelID: number, color: color3, iconInfo: IconModelInfo | undefined) {
+		this.iconId = iconId;
 		this.modelID = modelID;
 		this.color = color;
-		this.iconInfo = iconInfo;
+		this.modelPositioning = iconInfo;
 	}
 }

@@ -5,7 +5,7 @@ import { Tiles } from "./_tiles_";
 import { makeRules } from "./_rules_";
 import { GameRenderer } from "./render/GameRenderer";
 import { RandomSlice } from "./SeededRandom";
-import { Area3x3, isTile, MatchFlags, Rule } from "./Rule";
+import { Area3x3, isTile, RuleRotations, Rule } from "./Rule";
 import { ProgressionMeter } from "./ProgressionMeter";
 import { Grid } from "./Grid";
 import { Item } from "./Item";
@@ -17,10 +17,9 @@ import { Colors3 } from "../styles/colors";
 import { getLineTransform, trs3D } from "../utils/renderUtils";
 
 export const BuildTimestamp = __BUILD_TIMESTAMP__;
-export const BuildID = "blooming";
+export const BuildID = "botanic";
 
 const shouldLogTileDataUpdates = false;
-export const dev_ShouldAddDevVisualModels = false;
 
 export class CTX {
 	public game: GameState;
@@ -261,12 +260,28 @@ export class CTX {
 		// Consume items
 		this.game.consumeItem(item, tiles.length);
 
+		// Speed up animations
+		const prevAnimDuration = Anims.BaseDur;
+		const count = tiles.length;
+		function updateAnimSpeed(i) {
+			const t = i / (count - 1);
+			const speed01 = 4 * (t - t * t);
+			Anims.BaseDur = 0.1 * (1 - speed01) + 0.3;
+		}
+
 		// Place each item
+		let i = 0;
 		for (const tile of tiles) {
 			if (item.place) item.place(this, tile);
 			else this.replaceTile(tile, item);
+
+			updateAnimSpeed(i++);
 			this.regenVisuals();
 		}
+
+		// Restore animation speed
+		Anims.BaseDur = prevAnimDuration;
+
 
 		// Apply rules
 		this.applyRules();
@@ -325,7 +340,7 @@ export class CTX {
 		this.endAndAddCombinedAnim();
 	}
 
-	private applyRules() {
+	public applyRules() {
 		this.game.applyRules(this);
 		this.regenVisuals();
 	}
@@ -427,55 +442,6 @@ export class CTX {
 	public addNat(tile: Tile, n: number) { return this.game.addNat(tile, n); }
 
 	//#endregion GameState Access
-
-	public addDevVisualModels() {
-		// Dev: Add various models for visual development
-		console.warn("Adding Dev Visual Models");
-		this.startCombinedAnim();
-
-		addRotations(this, 1, 8, Tiles.House2);
-		addRotations(this, 5, 8, Tiles.House3);
-
-		addRotations(this, 1, 7, Tiles.Factory1);
-
-		addRotations(this, 1, 6, Tiles.House1);
-		addRotations(this, 5, 6, Tiles.Sawmill);
-
-		addTile(this, 4, 5, Tiles.Tree);
-		addTile(this, 5, 5, Tiles.Tree);
-		addTile(this, 6, 5, Tiles.Forest);
-		addTile(this, 7, 5, Tiles.Forest);
-		addTile(this, 8, 5, Tiles.BigTree);
-
-		addRotations(this, 1, 4, Tiles.Path);
-		addTile(this, 5, 4, Tiles.Fountain);
-
-		addTile(this, 1, 3, Tiles.Water);
-		addTile(this, 2, 3, Tiles.Water);
-		addTile(this, 3, 3, Tiles.Water);
-		addTile(this, 4, 3, Tiles.Water);
-		addTile(this, 5, 3, Tiles.Water);
-		addTile(this, 1, 2, Tiles.Water);
-		addTile(this, 2, 2, Tiles.Water);
-		addTile(this, 4, 2, Tiles.Water);
-		addTile(this, 4, 1, Tiles.Water);
-		addTile(this, 3, 2, Tiles.Path);
-		addTile(this, 5, 2, Tiles.Path);
-
-		this.applyRules();
-		this.endAndAddCombinedAnim();
-
-		function addRotations(self, xStart, y, tileType) {
-			self.replaceTile(self.game.grid.get(xStart++, y), tileType, 0);
-			self.replaceTile(self.game.grid.get(xStart++, y), tileType, 90);
-			self.replaceTile(self.game.grid.get(xStart++, y), tileType, 180);
-			self.replaceTile(self.game.grid.get(xStart++, y), tileType, 270);
-		}
-
-		function addTile(self, x, y, tileType) {
-			self.replaceTile(self.game.grid.get(x, y), tileType, 0);
-		}
-	}
 }
 
 export class GameState {
@@ -653,8 +619,7 @@ export class GameState {
 			return false; // no item
 
 		// Ensure the tile is in bounds
-		if (tile.pos.x < 1 || tile.pos.x > this.grid.size - 2
-			|| tile.pos.y < 1 || tile.pos.y > this.grid.size - 2)
+		if (!this.isPlayablePos(tile.pos))
 			return false;
 
 		// Check if the tile type has a custom placement function
@@ -665,6 +630,11 @@ export class GameState {
 			return false; // not empty
 
 		return true;
+	}
+
+	public isPlayablePos(pos: P2) {
+		return pos.x >= 1 && pos.x < this.grid.size - 1
+			&& pos.y >= 1 && pos.y < this.grid.size - 1;
 	}
 
 	//#endregion State Modification
@@ -818,7 +788,7 @@ export class GameState {
 				}
 
 				// Try matching rotations of the rule
-				if (rule.matchFlags & MatchFlags.Rotate1) {
+				if (rule.rotations & RuleRotations.Rotate1) {
 					if (rule.match.isMatch(rot090)) {
 						examinedAllRules = false;
 						ruleToApply = rule;
@@ -829,7 +799,7 @@ export class GameState {
 					}
 				}
 
-				if (rule.matchFlags & MatchFlags.Rotate4) {
+				if (rule.rotations & RuleRotations.Rotate4) {
 					if (rule.match.isMatch(rot180)) {
 						examinedAllRules = false;
 						ruleToApply = rule;

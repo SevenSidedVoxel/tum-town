@@ -73,7 +73,7 @@ export class GameAnim {
 
 
 export namespace Anims {
-	export const BaseDur = 1;
+	export var BaseDur = 1;
 
 	export function combined(anims: (GameAnim | undefined)[]): GameAnim | undefined {
 		anims = anims.filter(a => a);

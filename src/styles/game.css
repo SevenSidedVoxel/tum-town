@@ -150,16 +150,6 @@
 	text-align: center;
 }
 
-.game-icons-full-preview {
-	width: 100%;
-	aspect-ratio: 1/1;
-	background-color: #202020;
-	background-image: var(--img-game-icons);
-	background-size: 100%;
-	background-position: 0 0;
-	background-repeat: no-repeat;
-}
-
 .game-act-icons {
 	width: 100%;
 	height: 5em;
@@ -175,9 +165,8 @@
 	height: 100%;
 
 	aspect-ratio: 1/1;
-	background-image: var(--img-game-icons);
-	background-size: var(--img-game-icons-full-scale);
-	background-position: var(--icon-x-pos) var(--icon-y-pos);
+	background-size: 100%;
+	background-position: 0 0;
 	background-repeat: no-repeat;
 
 	background-color: var(--col-bgBtn);

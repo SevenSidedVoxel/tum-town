@@ -85,6 +85,12 @@ export class P2 {
 		this.y *= inv;
 	}
 
+	public abs() {
+		this.x = Math.abs(this.x);
+		this.y = Math.abs(this.y);
+		return this;
+	}
+
 	public clampXY(
 		xMin: number, xMax: number,
 		yMin: number, yMax: number

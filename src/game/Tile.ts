@@ -8,7 +8,7 @@ import { GameState, CTX as CTX } from "./GameState";
 import { Tiles } from "./_tiles_";
 import { ModelCollection } from "./ModelCollection";
 import { Pathing } from "./PathSystem";
-import { RenderAssets } from "./render/GameRenderer";
+import { RenderAssets } from "./render/RenderAssets";
 import { Color } from "three";
 
 export class Tile {
@@ -110,7 +110,7 @@ export class Tile {
 		ctx.addAnim(this.models.destroyAll_anim(duration));
 
 		// Destroy Paths
-		ctx.addAnim(ctx.paths.disconnectFromAll_anim(this.pos, duration));
+		ctx.paths.disconnectFromAll(this.pos);
 
 		// Reset cache
 		this.resetDrawCache();
@@ -127,7 +127,7 @@ export class Tile {
 		this.models.reset();
 
 		// Destroy Paths
-		ctx.addAnim(ctx.paths.disconnectFromAll_anim(this.pos, duration));
+		ctx.paths.disconnectFromAll(this.pos);
 
 		// Reset cache
 		this.resetDrawCache();

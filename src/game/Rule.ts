@@ -65,7 +65,7 @@ export class Adj8<T> {
 	) { }
 }
 
-export enum MatchFlags {
+export enum RuleRotations {
 	None = 0x0,
 
 	/** Check against the 0° and 90° rotations */
@@ -78,18 +78,25 @@ export enum MatchFlags {
 export class Rule {
 	public name: string;
 	public match: Match3x3;
-	public matchFlags: MatchFlags;
+	public rotations: RuleRotations;
+	public testMatch?: (ctx: CTX, area: Area3x3, rot: number) => boolean;
 	public apply: (ctx: CTX, area: Area3x3, rot: number) => void;
 
 	constructor(
 		name: string,
 		match: Partial<Match3x3>,
 		apply: (ctx: CTX, area: Area3x3, rot: number) => void,
-		matchFlags?: MatchFlags
-	) {
+		{
+			testMatch = undefined,
+			rotations = RuleRotations.None,
+		}: {
+			testMatch?: (ctx: CTX, area: Area3x3, rot: number) => boolean,
+			rotations?: RuleRotations
+		}) {
 		this.name = name;
 		this.match = new Match3x3(match);
-		this.matchFlags = matchFlags ?? MatchFlags.Rotate1;
+		this.rotations = rotations ?? RuleRotations.None;
+		this.testMatch = testMatch;
 		this.apply = apply;
 	}
 }

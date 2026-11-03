@@ -83,7 +83,7 @@ export class PathSystem {
 
 	private game: GameState;
 	private grid: Grid<Path[]>;
-	private pathsToRebuild: Path[] = [];
+	private dirtyPaths: Path[] = [];
 
 	constructor(game: GameState) {
 		this.game = game;
@@ -175,9 +175,31 @@ export class PathSystem {
 			console.log(`Remove path from ${from.name()} to ${to.name()}`);
 		return path ?? null;
 	}
+	private restorePath(path: Path): Path {
+		const fromPaths = this.getPaths(path.pA);
+		const toPaths = this.getPaths(path.pB);
+		if (!fromPaths && !toPaths)
+			throw "Adding a path between grid cells that are both out of bounds";
 
-	public connectTiles(ctx: CTX, from: P2, to: P2): Path | null {
+		fromPaths?.push(path);
+		toPaths?.push(path);
+		if (shouldLog)
+			console.log(`Restored path from ${path.pA.name()} to ${path.pB.name()}`);
+
+		return path;
+	}
+
+	public connectTiles(from: P2, to: P2): Path | null {
 		let [_, path] = this.findPath(from, to);
+
+		if (path == null) {
+			// Check if there is a path we can recycle
+			const index = this.dirtyPaths.findIndex(p => !p.isUsed && p.connects(from, to));
+			if (index != -1) {
+				path = this.restorePath(this.dirtyPaths[index]!);
+				this.dirtyPaths.splice(index, 1);
+			}
+		}
 
 		// Check if path is already connected as desired
 		const start = Tile.calcVisualCenterPos(from);
@@ -191,14 +213,7 @@ export class PathSystem {
 			return path;
 		}
 
-		if (path) {
-			// Reuse old path (after destroying old models)
-			// TODO: Consider morphing the path
-			ctx.addAnim(path.models
-				.destroyAll_anim(0)
-				?.delayed(Anims.BaseDur * 0.5));
-		}
-		else {
+		if (!path) {
 			// Create a new path
 			path = this.addPath(from, to);
 		}
@@ -207,15 +222,15 @@ export class PathSystem {
 		path.startPos.copy(start);
 		path.endPos.copy(end);
 		path.isUsed = true;
-		this.pathsToRebuild.push(path);
+		this.dirtyPaths.push(path);
 		return path;
 	}
-	public disconnectTiles(ctx: CTX, from: P2, to: P2) {
+	public disconnectTiles(from: P2, to: P2) {
 		let path = this.removePath(from, to);
 		if (!path) return;
 
 		path.isUsed = false;
-		this.pathsToRebuild.push(path);
+		this.dirtyPaths.push(path);
 	}
 
 	public connectToAll_Adj4(
@@ -231,10 +246,10 @@ export class PathSystem {
 		function tryConnect(xOffset, yOffset) {
 			const otherTile = ctx.grid.getOffset(tile.pos, xOffset, yOffset);
 			if (canConnect(otherTile)) {
-				ctx.paths.connectTiles(ctx, tile.pos, otherTile.pos);
+				ctx.paths.connectTiles(tile.pos, otherTile.pos);
 			}
 			else {
-				ctx.paths.disconnectTiles(ctx, tile.pos, otherTile.pos);
+				ctx.paths.disconnectTiles(tile.pos, otherTile.pos);
 			}
 		}
 	}
@@ -258,7 +273,7 @@ export class PathSystem {
 		function tryConnect(xOffset, yOffset) {
 			const otherTile = ctx.grid.getOffset(tile.pos, xOffset, yOffset);
 			if (canConnect(otherTile)) {
-				ctx.paths.connectTiles(ctx, tile.pos, otherTile.pos);
+				ctx.paths.connectTiles(tile.pos, otherTile.pos);
 				return true;
 			}
 
@@ -305,9 +320,9 @@ export class PathSystem {
 
 		function updatePath(tile: Tile, otherTile: Tile, shouldConnect: boolean, forceRemove: boolean) {
 			if (shouldConnect)
-				ctx.paths.connectTiles(ctx, tile.pos, otherTile.pos);
+				ctx.paths.connectTiles(tile.pos, otherTile.pos);
 			else if (otherTile.type == Tiles.Empty || forceRemove)
-				ctx.paths.disconnectTiles(ctx, tile.pos, otherTile.pos);
+				ctx.paths.disconnectTiles(tile.pos, otherTile.pos);
 		}
 	}
 
@@ -356,7 +371,7 @@ export class PathSystem {
 
 		function tryConnect(otherTile, shouldConnect) {
 			if (shouldConnect) {
-				ctx.paths.connectTiles(ctx, tile.pos, otherTile.pos);
+				ctx.paths.connectTiles(tile.pos, otherTile.pos);
 				return true;
 			}
 
@@ -387,59 +402,51 @@ export class PathSystem {
 			const newTile = ctx.grid.getOffset(tile.pos, connDir.x, connDir.y);
 			if (canConnect(newTile)) {
 				// TODO: Consider morphing the path instead of recreating it
-				this.disconnectTiles(ctx, tile.pos, oldConnPos);
-				this.connectTiles(ctx, tile.pos, newTile.pos);
+				this.disconnectTiles(tile.pos, oldConnPos);
+				this.connectTiles(tile.pos, newTile.pos);
 				return;
 			}
 		}
 	}
 
 
-	public disconnectFromAll(ctx: CTX, pos: P2) {
-		ctx.addAnim(this.disconnectFromAll_anim(pos));
-	}
-	public disconnectFromAll_anim(pos: P2, duration: number = Anims.BaseDur) {
+	public disconnectFromAll(pos: P2) {
 		const paths = this.getPaths(pos);
 		if (paths.length < 1)
 			return null;
 
-		let anims: GameAnim[] = [];
-		for (const path of paths) {
-			const anim = path.models.destroyAll_anim(duration);
-			if (anim)
-				anims.push(anim);
+		const pathsToRemove = [...paths];
+		for (const path of pathsToRemove) {
+			this.disconnectTiles(path.pA, path.pB);
 		}
 		paths.length = 0;
-
-		return Anims.combined(anims);
 	}
 
-	public removeUnusedPathsAfterRegen(ctx: CTX, pos: P2) {
-		const paths = ctx.paths.getPaths(pos);
-		for (const path of paths) {
-			path.isUsed = false;
-		}
+	// public removeUnusedPathsAfterRegen(ctx: CTX, pos: P2) {
+	// 	const paths = ctx.paths.getPaths(pos);
+	// 	for (const path of paths) {
+	// 		path.isUsed = false;
+	// 	}
 
-		ctx.afterRegenHandlers.push(afterRegen);
+	// 	ctx.afterRegenHandlers.push(afterRegen);
 
-		function afterRegen() {
-			for (let i = paths.length; i >= 0; --i) {
-				const path = paths[i]!;
-				if (path.isUsed) continue;
+	// 	function afterRegen() {
+	// 		for (let i = paths.length; i >= 0; --i) {
+	// 			const path = paths[i]!;
+	// 			if (path.isUsed) continue;
 
-				ctx.game.addAnim(path.models.destroyAll_anim());
-				paths.splice(i, 1);
-			}
-		}
-	}
+	// 			ctx.game.addAnim(path.models.destroyAll_anim());
+	// 			paths.splice(i, 1);
+	// 		}
+	// 	}
+	// }
 
 	public regen(ctx: CTX) {
-		for (const path of this.pathsToRebuild) {
+		for (const path of this.dirtyPaths) {
 			if (path.isUsed) {
 				// Rebuild
 				const tile = ctx.grid.get(path.pA);
 				ctx.addAnim(PathSystem.addPathLines_anim(ctx, tile, path));
-
 			}
 			else {
 				// Destroy
@@ -447,7 +454,7 @@ export class PathSystem {
 			}
 		}
 
-		this.pathsToRebuild.length = 0;
+		this.dirtyPaths.length = 0;
 	}
 
 	public getTotalCount(): any {

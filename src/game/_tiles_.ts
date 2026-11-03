@@ -62,7 +62,9 @@ export const Tiles = {
 	House2: makeSimpleBuilding("house2", a => a.model_House2, { scale: 0.8, color: Colors3.tileHouse2 }),
 	House3: makeSimpleBuilding("house3", a => a.model_House3, { scale: 0.8, color: Colors3.tileHouse3 }),
 
-	Factory1: makeSimpleBuilding("building", a => a.model_Factory1, { scale: 0.8, color: Colors3.tileHouse2 }),
+	Foundation1: makeSimpleBuilding("building", a => a.model_Factory1, { scale: 0.8, color: Colors3.tileHouse2 }),
+	TownBell: makeSimpleBuilding("town bell", a => a.model_TownBell, { color: Colors3.tileHouse2, ground: 'small' })
+		.withPathing(Pathing.ConnectAll_Adj4().preventDiagonals()),
 	Sawmill: {
 		name: "sawmill",
 		model: a => a.model_Sawmill,
@@ -125,30 +127,8 @@ export const Tiles = {
 			}
 		}
 	},
-	Fountain: {
-		name: "fountain",
-		model: a => a.model_Fountain,
-		color: Colors3.tileRoad1,
-		centerVariance: 0,
-		pathing: Pathing.ConnectAll_Adj4()
-			.preventDiagonals(),
-		regen(ctx, tile) {
-			if (tile.firstTimeBuild()) {
-				const rng = tile.rng(ctx);
-				const pos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
-
-				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
-				ctx.growMeshOnTile(
-					tile.models,
-					tile,
-					ctx.assets.getModel(this.model),
-					new color3(this.color),
-					pos,
-				);
-				addGroundPath(ctx, tile, rng, "large");
-			}
-		},
-	},
+	Fountain: makeSimpleBuilding("fountain", a => a.model_Fountain, { ground: "large" })
+		.withPathing(Pathing.ConnectAll_Adj4().preventDiagonals()),
 
 	Tree: {
 		name: "tree",
@@ -459,6 +439,17 @@ export const Tiles = {
 	},
 } as const satisfies Record<string, TileType>;
 
+function makeTileBuilder(tile: TileType) {
+	const builder = {
+		...tile,
+		withPathing(pathing: Pathing) {
+			this.pathing = pathing;
+			return this;
+		}
+	}
+	return builder;
+}
+
 function makeSimpleBuilding(
 	name: string,
 	model: (a: RenderAssets) => number,
@@ -472,7 +463,7 @@ function makeSimpleBuilding(
 	const baseModelRot = draw?.rot ?? 0;
 	const color = draw?.color ?? Colors3.tileHouse1;
 	const ground = draw?.ground;
-	return {
+	return makeTileBuilder({
 		name: name,
 		model: model,
 		color: color,
@@ -504,7 +495,7 @@ function makeSimpleBuilding(
 					addGroundPath(ctx, tile, rng, ground);
 			}
 		},
-	};
+	});
 }
 
 function addGroundPath(ctx: CTX, tile: Tile, rng: RandomSlice, size: 'small' | 'large', color: color3 = Colors3.tileRoad1) {

@@ -8,7 +8,7 @@ import { GameState, CTX as CTX } from "./GameState";
 import { Tiles } from "./_tiles_";
 import { ModelCollection } from "./ModelCollection";
 import { Pathing } from "./PathSystem";
-import { RenderAssets } from "./render/RenderAssets";
+import { RenderAssets } from "./render/_assets_";
 import { Color } from "three";
 
 export class Tile {
@@ -145,6 +145,7 @@ class TileDrawCache {
 export type TileIcon = {
 	baseSize?: number;
 	baseDegZ?: number;
+	model?: (assets: RenderAssets) => number;
 };
 
 export type TileType = {

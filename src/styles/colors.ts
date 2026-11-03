@@ -39,6 +39,10 @@ export const Colors = {
 	tileTree3: 0x55b853,
 	floorDirt: 0x201c18,
 	floorForest: 0x0c2918,
+	flower1: 0x9e5d25,
+	flower2: 0xbc7127,
+	flower3: 0x9e6e25,
+	flower4: 0x9e4d25,
 } as const;
 
 export const Colors3 = {
@@ -78,4 +82,8 @@ export const Colors3 = {
 	tileTree3: new THREE.Color(Colors.tileTree3),
 	floorDirt: new THREE.Color(Colors.floorDirt),
 	floorForest: new THREE.Color(Colors.floorForest),
+	flower1: new THREE.Color(Colors.flower1),
+	flower2: new THREE.Color(Colors.flower2),
+	flower3: new THREE.Color(Colors.flower3),
+	flower4: new THREE.Color(Colors.flower4),
 } as const;

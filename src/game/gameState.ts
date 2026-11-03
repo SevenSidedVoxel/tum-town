@@ -17,7 +17,7 @@ import { Colors3 } from "../styles/colors";
 import { getLineTransform, trs3D } from "../utils/renderUtils";
 
 export const BuildTimestamp = __BUILD_TIMESTAMP__;
-export const BuildID = "botanic";
+export const BuildID = "bereaved";
 
 const shouldLogTileDataUpdates = false;
 
@@ -167,12 +167,17 @@ export class CTX {
 				);
 
 				let lineTRS = getLineTransform(prevPos, currPos, 0.5);
+				let color = Colors3.placementGood;
+				if (!canPlace) {
+					color = Colors3.placementBad;
+					lineTRS.pos.setZ(zDepth + 0.01);
+				}
 				this.renderer.addModel_TRS(
 					this.assets.model_LineSeg,
 					lineTRS.pos,
 					lineTRS.rot,
 					lineTRS.scale,
-					canPlace ? Colors3.placementGood : Colors3.placementBad,
+					color,
 					this.game.placementModels
 				);
 
@@ -510,6 +515,7 @@ export class GameState {
 		this.addItem(Tiles.House1, 1);
 		this.addItem(Tiles.Path, 1);
 		this.addItem(Tiles.Tree, 1);
+		this.addItem(Tiles.Stone, 1);
 		this.addItem(Tiles.Water, 1);
 	}
 
@@ -663,7 +669,7 @@ export class GameState {
 		}
 
 		const icon = this.renderer.addModelIcon(
-			this.assets.getModel(type.model),
+			this.assets.getModel(type.icon?.model ?? type.model),
 			type.color ?? Colors3.white,
 			type.icon);
 		const item = new Item(type, count, icon);
@@ -740,94 +746,105 @@ export class GameState {
 			return;
 
 		// TODO: Consider optimizing by caching the applicable rules against the tile type
+		// TODO: Sort the applicable cached rules by priority
 
-		let ruleIndex = Number.MAX_SAFE_INTEGER;
+		let chosenPriority = 0;
+		let chosenIndex = Number.MAX_SAFE_INTEGER;
 		let ruleToApply: Rule | null = null;
 		let areaToApply: Area3x3 | null = null;
 		let rotToApply = 0;
 
 		// Check all tiles that require checking
-		for (const cc of this.grid.cells) {
-			if (!cc.shouldCheck) continue;
+		for (const c of this.grid.cells) {
+			if (!c.shouldCheck) continue;
 
 			let examinedAllRules = true;
 
-			const pos = cc.pos;
-			const tl = this.grid.get(pos.x - 1, pos.y + 1);
-			const tc = this.grid.get(pos.x + 0, pos.y + 1);
-			const tr = this.grid.get(pos.x + 1, pos.y + 1);
-			const cl = this.grid.get(pos.x - 1, pos.y + 0);
-			const cr = this.grid.get(pos.x + 1, pos.y + 0);
-			const bl = this.grid.get(pos.x - 1, pos.y - 1);
-			const bc = this.grid.get(pos.x + 0, pos.y - 1);
-			const br = this.grid.get(pos.x + 1, pos.y - 1);
+			const pos = c.pos;
+			const ul = this.grid.get(pos.x - 1, pos.y + 1);
+			const u = this.grid.get(pos.x + 0, pos.y + 1);
+			const ur = this.grid.get(pos.x + 1, pos.y + 1);
+			const l = this.grid.get(pos.x - 1, pos.y + 0);
+			const r = this.grid.get(pos.x + 1, pos.y + 0);
+			const dl = this.grid.get(pos.x - 1, pos.y - 1);
+			const d = this.grid.get(pos.x + 0, pos.y - 1);
+			const dr = this.grid.get(pos.x + 1, pos.y - 1);
 
-			let rot000 = new Area3x3(tl, tc, tr, cl, cc, cr, bl, bc, br);
-			let rot090 = new Area3x3(bl, cl, tl, bc, cc, tc, br, cr, tr);
-			let rot180 = new Area3x3(br, bc, bl, cr, cc, cl, tr, tc, tl);
-			let rot270 = new Area3x3(tr, cr, br, tc, cc, bc, tl, cl, bl);
+			let rot000 = new Area3x3(ul, u, ur, l, c, r, dl, d, dr);
+			let rot090 = new Area3x3(dl, l, ul, d, c, u, dr, r, ur);
+			let rot180 = new Area3x3(dr, d, dl, r, c, l, ur, u, ul);
+			let rot270 = new Area3x3(ur, r, dr, u, c, d, ul, l, dl);
 
 			// Search through rules
-			for (const [index, rule] of this.rules.entries()) {
-				if (index >= ruleIndex) {
+			const rules = this.rules.entries();
+			for (const [index, rule] of rules) {
+				if (index > chosenIndex
+					|| rule.priority < chosenPriority) {
 					examinedAllRules = false;
-					break; // A matched rule is better
+					continue; // A matched rule is better
 				}
 
-				if (!isTile(rule.match.c, cc.type))
+				if (!isTile(rule.centerTile, c.type))
 					continue; // Center does not match
 
+				// console.log(`[${c.name}] testing rule '${rule.name}'`);
+
 				// Try matching the rule
-				if (rule.match.isMatch(rot000)) {
+				if (rule.testMatch(ctx, rot000, 0)) {
 					examinedAllRules = false;
 					ruleToApply = rule;
 					areaToApply = rot000;
 					rotToApply = 0;
-					ruleIndex = index;
+					chosenPriority = rule.priority;
+					chosenIndex = index;
 					break;
 				}
 
 				// Try matching rotations of the rule
 				if (rule.rotations & RuleRotations.Rotate1) {
-					if (rule.match.isMatch(rot090)) {
+					if (rule.testMatch(ctx, rot090, 90)) {
 						examinedAllRules = false;
 						ruleToApply = rule;
 						areaToApply = rot090;
 						rotToApply = 90;
-						ruleIndex = index;
+						chosenPriority = rule.priority;
+						chosenIndex = index;
 						break;
 					}
 				}
 
 				if (rule.rotations & RuleRotations.Rotate4) {
-					if (rule.match.isMatch(rot180)) {
+					if (rule.testMatch(ctx, rot180, 180)) {
 						examinedAllRules = false;
 						ruleToApply = rule;
 						areaToApply = rot180;
 						rotToApply = 180;
-						ruleIndex = index;
+						chosenPriority = rule.priority;
+						chosenIndex = index;
 						break;
 					}
 
-					if (rule.match.isMatch(rot270)) {
+					if (rule.testMatch(ctx, rot270, 270)) {
 						examinedAllRules = false;
 						ruleToApply = rule;
 						areaToApply = rot270;
 						rotToApply = 270;
-						ruleIndex = index;
+						chosenPriority = rule.priority;
+						chosenIndex = index;
 						break;
 					}
 				}
 			}
 
 			// Only mark the tile checked if every rule was examined
+			//  (which also means no matching rules were found)
 			if (examinedAllRules)
-				this.markTileChecked(cc);
+				this.markTileChecked(c);
 		}
 
 		// If we found a rule, apply it
 		if (ruleToApply !== null) {
-			console.log(`Applying rule '${ruleToApply.name}' at ${areaToApply!.c.pos.name()}`);
+			console.log(`[${areaToApply!.c.pos.name()}] Applying rule '${ruleToApply.name}'`);
 			ruleToApply.apply(ctx, areaToApply!, rotToApply);
 		}
 		// else console.log(`No rule to apply`);

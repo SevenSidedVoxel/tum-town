@@ -9,35 +9,61 @@ export function addDevVisualModels(ctx: CTX) {
 	console.warn("Adding Dev Visual Models");
 	ctx.startCombinedAnim();
 
-	addRotations(ctx, 1, 8, Tiles.House2);
-	addRotations(ctx, 5, 8, Tiles.House3);
+	if (true) {
+		addRotations(ctx, 1, 1, Tiles.Graveyard);
+		addRotations(ctx, 5, 1, Tiles.Graveyard);
+		addRotations(ctx, 1, 2, Tiles.Graveyard);
+		addRotations(ctx, 5, 2, Tiles.Graveyard);
+		addRotations(ctx, 1, 3, Tiles.Graveyard);
+		addRotations(ctx, 5, 3, Tiles.Graveyard);
+		addRotations(ctx, 1, 4, Tiles.Graveyard);
+		addRotations(ctx, 5, 4, Tiles.Graveyard);
+		addRotations(ctx, 1, 5, Tiles.Graveyard);
+		addRotations(ctx, 5, 5, Tiles.Graveyard);
+		addRotations(ctx, 1, 6, Tiles.Graveyard);
+		addRotations(ctx, 5, 6, Tiles.Graveyard);
+		addRotations(ctx, 1, 7, Tiles.Graveyard);
+		addRotations(ctx, 5, 7, Tiles.Graveyard);
+		addRotations(ctx, 1, 8, Tiles.Graveyard);
+		addRotations(ctx, 5, 8, Tiles.Graveyard);
+	}
 
-	addRotations(ctx, 1, 7, Tiles.Foundation1);
-	
-	addRotations(ctx, 1, 6, Tiles.House1);
-	addRotations(ctx, 5, 6, Tiles.Sawmill);
-	
-	addTile(ctx, 4, 5, Tiles.Tree);
-	addTile(ctx, 5, 5, Tiles.Tree);
-	addTile(ctx, 6, 5, Tiles.Forest);
-	addTile(ctx, 7, 5, Tiles.Forest);
-	addTile(ctx, 8, 5, Tiles.BigTree);
-	
-	addRotations(ctx, 1, 4, Tiles.Path);
-	addTile(ctx, 5, 4, Tiles.Fountain);
-	addTile(ctx, 6, 4, Tiles.TownBell);
+	if (false) {
+		addRotations(ctx, 1, 8, Tiles.House2);
+		addRotations(ctx, 5, 8, Tiles.House3);
 
-	addTile(ctx, 1, 3, Tiles.Water);
-	addTile(ctx, 2, 3, Tiles.Water);
-	addTile(ctx, 3, 3, Tiles.Water);
-	addTile(ctx, 4, 3, Tiles.Water);
-	addTile(ctx, 5, 3, Tiles.Water);
-	addTile(ctx, 1, 2, Tiles.Water);
-	addTile(ctx, 2, 2, Tiles.Water);
-	addTile(ctx, 4, 2, Tiles.Water);
-	addTile(ctx, 4, 1, Tiles.Water);
-	addTile(ctx, 3, 2, Tiles.Path);
-	addTile(ctx, 5, 2, Tiles.Path);
+		addRotations(ctx, 1, 7, Tiles.House1);
+		addTile(ctx, 5, 7, Tiles.Church);
+		addTile(ctx, 6, 7, Tiles.Graveyard);
+
+		addRotations(ctx, 1, 6, Tiles.Foundation1);
+		addRotations(ctx, 5, 6, Tiles.Sawmill);
+
+		addTile(ctx, 1, 5, Tiles.Stone);
+		addTile(ctx, 2, 5, Tiles.Stone);
+		addTile(ctx, 3, 5, Tiles.Stone);
+		addTile(ctx, 4, 5, Tiles.Tree);
+		addTile(ctx, 5, 5, Tiles.Tree);
+		addTile(ctx, 6, 5, Tiles.Forest);
+		addTile(ctx, 7, 5, Tiles.Forest);
+		addTile(ctx, 8, 5, Tiles.BigTree);
+
+		addRotations(ctx, 1, 4, Tiles.Path);
+		addTile(ctx, 5, 4, Tiles.Fountain);
+		addTile(ctx, 6, 4, Tiles.TownBell);
+
+		addTile(ctx, 1, 3, Tiles.Water);
+		addTile(ctx, 2, 3, Tiles.Water);
+		addTile(ctx, 3, 3, Tiles.Water);
+		addTile(ctx, 4, 3, Tiles.Water);
+		addTile(ctx, 5, 3, Tiles.Water);
+		addTile(ctx, 1, 2, Tiles.Water);
+		addTile(ctx, 2, 2, Tiles.Water);
+		addTile(ctx, 4, 2, Tiles.Water);
+		addTile(ctx, 4, 1, Tiles.Water);
+		addTile(ctx, 3, 2, Tiles.Path);
+		addTile(ctx, 5, 2, Tiles.Path);
+	}
 
 	ctx.applyRules();
 	ctx.endAndAddCombinedAnim();
@@ -63,11 +89,14 @@ export class RenderAssets {
 	public model_TileBG!: number;
 	public model_Hover!: number;
 	public model_HoverActive!: number;
-	public model_House1!: number;
-	public model_House2!: number;
-	public model_House3!: number;
 
-	public model_Factory1!: number;
+	public model_House!: number;
+	public model_House_L!: number;
+	public model_House_Big!: number;
+	public model_Church!: number;
+	public model_Graves!: number[];
+
+	public model_Building!: number;
 	public model_Sawmill!: number;
 
 	public model_LineSeg!: number;
@@ -85,6 +114,9 @@ export class RenderAssets {
 	public model_SingleTrees!: number[];
 	public model_BigTree!: number;
 	public model_XmasTree!: number;
+
+	public model_Stone1!: number;
+	public model_SingleStones!: number[];
 
 	public model_Water!: number;
 	public model_WaterTiles!: number[];
@@ -106,10 +138,19 @@ export class RenderAssets {
 		this.model_TileBG = addGeom(this, 'tile_bg');
 		this.model_Hover = addGeom(this, 'hover');
 		this.model_HoverActive = addGeom(this, 'hover_active');
-		this.model_House1 = addGeom(this, 'house.001');
-		this.model_House2 = addGeom(this, 'house.002');
-		this.model_House3 = addGeom(this, 'house.003');
-		this.model_Factory1 = addGeom(this, 'building.002');
+
+		this.model_House = addGeom(this, 'house');
+		this.model_House_L = addGeom(this, 'house_L');
+		this.model_House_Big = addGeom(this, 'house_Big');
+		this.model_Church = addGeom(this, 'church');
+		this.model_Graves = [
+			addGeom(this, 'grave.001'),
+			addGeom(this, 'grave.002'),
+			addGeom(this, 'grave.003'),
+			addGeom(this, 'grave.004'),
+		];
+
+		this.model_Building = addGeom(this, 'building');
 		this.model_Sawmill = addGeom(this, 'sawmill');
 
 		this.model_RoadStone = addGeom(this, 'road_stone');
@@ -130,6 +171,14 @@ export class RenderAssets {
 		this.model_SingleTrees.push(this.model_Tree1); // make Tree1 more likely
 		this.model_BigTree = addGeom(this, 'tree_big.001');
 		this.model_XmasTree = addGeom(this, 'tree_xmas');
+
+		this.model_SingleStones = [
+			addGeom(this, 'stone.001'),
+			addGeom(this, 'stone.002'),
+			addGeom(this, 'stone.003'),
+			addGeom(this, 'stone.004'),
+		];
+		this.model_Stone1 = this.model_SingleStones[0]!;
 
 		this.model_Water = addGeom(this, 'water_0');
 		this.model_WaterTiles = [

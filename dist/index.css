@@ -243,12 +243,11 @@
 
 .game-act-icons {
   display: flex;
-  flex-direction: row;
+  flex-flow: wrap;
   justify-content: center;
   align-items:  center;
   gap: 10px;
   width: 100%;
-  height: 5em;
 }
 
 .game-act-icon {
@@ -259,7 +258,7 @@
   background-color: var(--col-bgBtn);
   border: 10px solid var(--col-bgBtn);
   border-radius: 10px;
-  height: 100%;
+  height: 5em;
 }
 
 .game-act-icon-selected {
@@ -351,6 +350,10 @@
   --col-tileTree3: #55b853;
   --col-floorDirt: #201c18;
   --col-floorForest: #0c2918;
+  --col-flower1: #9e5d25;
+  --col-flower2: #bc7127;
+  --col-flower3: #9e6e25;
+  --col-flower4: #9e4d25;
 }
 
 /* src/styles/anims.css */

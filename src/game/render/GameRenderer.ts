@@ -16,7 +16,7 @@ import { Colors, Colors3 } from '../../styles/colors';
 import { color3, float2, float3, float4, mat4x4, quat4, Utils3, ZAxis } from "../../utils/threeUtils";
 import { BatchedInstance } from './BatchedInstance';
 import { degToRad } from 'three/src/math/MathUtils.js';
-import { RenderAssets } from './RenderAssets';
+import { RenderAssets } from './_assets_';
 
 export const Z_PathDepth = -0.01;
 export const Z_GroundDepth = -0.02;

@@ -41,5 +41,10 @@
 	"tileTree3": "#55b853",
 
 	"floorDirt": "#201c18",
-	"floorForest": "#0c2918"
+	"floorForest": "#0c2918",
+
+	"flower1": "#9e5d25",
+	"flower2": "#bc7127",
+	"flower3": "#9e6e25",
+	"flower4": "#9e4d25"
 }

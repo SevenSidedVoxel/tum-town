@@ -97,6 +97,7 @@ export class P2 {
 	) {
 		this.x = Math.min(xMax, Math.max(xMin, this.x));
 		this.y = Math.min(yMax, Math.max(yMin, this.y));
+		return this;
 	}
 }
 

@@ -46,6 +46,18 @@ export class Area3x3 {
 	public static create(tiles: TileArray3x3) {
 		return new Area3x3(...tiles);
 	}
+
+	*[Symbol.iterator](): Generator<Tile, void, unknown> {
+		yield this.ul;
+		yield this.u;
+		yield this.ur;
+		yield this.l;
+		yield this.c;
+		yield this.r;
+		yield this.dl;
+		yield this.d;
+		yield this.dr;
+	}
 }
 
 export class Adj4<T> {
@@ -77,26 +89,52 @@ export enum RuleRotations {
 
 export class Rule {
 	public name: string;
-	public match: Match3x3;
+	public priority: number = 1;
 	public rotations: RuleRotations;
-	public testMatch?: (ctx: CTX, area: Area3x3, rot: number) => boolean;
+	public centerTile: TileType;
+	public testMatch: (ctx: CTX, area: Area3x3, rot: number) => boolean;
 	public apply: (ctx: CTX, area: Area3x3, rot: number) => void;
 
 	constructor(
 		name: string,
-		match: Partial<Match3x3>,
-		apply: (ctx: CTX, area: Area3x3, rot: number) => void,
-		{
-			testMatch = undefined,
-			rotations = RuleRotations.None,
-		}: {
-			testMatch?: (ctx: CTX, area: Area3x3, rot: number) => boolean,
-			rotations?: RuleRotations
-		}) {
+		rotations: RuleRotations = RuleRotations.None,
+		centerTile: TileType,
+		testMatch: (ctx: CTX, area: Area3x3, rot: number) => boolean,
+		apply: (ctx: CTX, area: Area3x3, rot: number) => void) {
 		this.name = name;
-		this.match = new Match3x3(match);
-		this.rotations = rotations ?? RuleRotations.None;
+		this.rotations = rotations;
+		this.centerTile = centerTile;
 		this.testMatch = testMatch;
 		this.apply = apply;
 	}
+}
+
+export function makeRule(
+	name: string,
+	rotations: RuleRotations = RuleRotations.None,
+	centerTile: TileType,
+	testMatch: (ctx: CTX, area: Area3x3, rot: number) => boolean,
+	apply: (ctx: CTX, area: Area3x3, rot: number) => void) {
+	return new Rule(
+		name,
+		rotations,
+		centerTile,
+		testMatch,
+		apply
+	);
+}
+
+export function makeRule_Match(
+	name: string,
+	rotations: RuleRotations = RuleRotations.None,
+	areaMatch: Partial<Match3x3>,
+	apply: (ctx: CTX, area: Area3x3, rot: number) => void) {
+	const match3 = new Match3x3(areaMatch);
+	return new Rule(
+		name,
+		rotations,
+		match3.c,
+		(ctx, area, rot) => match3.isMatch(area),
+		apply
+	);
 }

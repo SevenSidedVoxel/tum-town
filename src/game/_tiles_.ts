@@ -8,7 +8,7 @@ import { Z_GroundDepth, Z_PathDepth } from "./render/GameRenderer";
 import { calcFillTileType } from './render/FillTileTypes';
 import { RandomSlice } from "./SeededRandom";
 import { Tile, TileType } from "./Tile";
-import { RenderAssets } from "./render/RenderAssets";
+import { RenderAssets } from "./render/_assets_";
 
 export const Tiles = {
 	Any: { name: "any" },
@@ -23,7 +23,7 @@ export const Tiles = {
 
 	House1: {
 		name: "house",
-		model: a => a.model_House1,
+		model: a => a.model_House,
 		icon: {
 			baseSize: 1.6,
 			baseDegZ: 5,
@@ -59,46 +59,82 @@ export const Tiles = {
 			}
 		},
 	},
-	House2: makeSimpleBuilding("house2", a => a.model_House2, { scale: 0.8, color: Colors3.tileHouse2 }),
-	House3: makeSimpleBuilding("house3", a => a.model_House3, { scale: 0.8, color: Colors3.tileHouse3 }),
+	House2: makeSimpleBuilding("big house", a => a.model_House_L, { scale: 0.8, color: Colors3.tileHouse2 }),
+	House3: makeSimpleBuilding("mansion", a => a.model_House_Big, { scale: 0.8, color: Colors3.tileHouse3 }),
 
-	Foundation1: makeSimpleBuilding("building", a => a.model_Factory1, { scale: 0.8, color: Colors3.tileHouse2 }),
-	TownBell: makeSimpleBuilding("town bell", a => a.model_TownBell, { color: Colors3.tileHouse2, ground: 'small' })
-		.withPathing(Pathing.ConnectAll_Adj4().preventDiagonals()),
-	Sawmill: {
-		name: "sawmill",
-		model: a => a.model_Sawmill,
-		color: Colors3.tileHouse2,
-		pathing: Pathing.ConnectAny_Adj4(),
-		interact(ctx, tile) {
-			ctx.paths.rotatePath_Adj4(ctx, tile);
-		},
+	Foundation1: makeSimpleBuilding("building", a => a.model_Building, { scale: 0.8, color: Colors3.tileHouse2 }),
+
+	Church: makeSimpleBuilding("church", a => a.model_Church, { scale: 0.8, color: Colors3.white }),
+	Graveyard: {
+		name: "graveyard",
+		model: a => a.model_Graves[0]!,
+		color: Colors3.white,
 		regen(ctx, tile) {
 			if (tile.firstTimeBuild()) {
-				// Add model
 				const rng = tile.rng(ctx);
 				const centerPos = Tile.calcVisualCenterPos(tile.pos, rng, this.centerVariance);
-				const size = 1;
-				const zDeg = tile.rot ?? 0;
+
+				const color = rng.choose([Colors3.flower1, Colors3.flower2, Colors3.flower3, Colors3.flower4]);
 
 				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
-				ctx.growMeshOnTile(
-					tile.models,
-					tile,
-					ctx.assets.getModel(this.model),
-					new color3(this.color),
-					centerPos,
-					new float3(size, size, size),
-					Utils3.rotZDeg(zDeg),
-				);
-				addGroundPath(ctx, tile, rng, "large");
+				const posVariance = 0.05;
+				let positions: P2[];
+				const positionsChoice = rng.nextI(0, 3);
+				switch (positionsChoice) {
+					case 2:
+						positions = [
+							new P2(0.7, 0.25),
+							new P2(0.3, 0.4),
+							new P2(0.5, 0.75),
+						];
+						break;
+					case 1:
+						positions = [
+							new P2(0.3, 0.25),
+							new P2(0.7, 0.4),
+							new P2(0.5, 0.75),
+						];
+						break;
+					case 0:
+					default:
+						positions = [
+							new P2(0.3, 0.25),
+							new P2(0.25, 0.75),
+							new P2(0.75, 0.25),
+							new P2(0.75, 0.75),
+						];
+						break;
+				}
+				for (let pos of positions) {
+					const model = rng.choose(ctx.assets.model_Graves);
+					const p = pos
+						.addXY(centerPos.x - 0.5, centerPos.y - 0.5)
+						.addXY(rng.nextF(-posVariance, posVariance), rng.nextF(-posVariance, posVariance));
+					ctx.growMeshOnTile(
+						tile.models,
+						tile,
+						model,
+						color,
+						new float3(p.x, p.y, 0),
+						new float3().setScalar(rng.nextF(0.8, 1)),
+						Utils3.rotZDeg(rng.nextF(-30, +30)),
+					);
+				}
 			}
 		},
 	},
 
+	TownBell: makeSimpleBuilding("town bell", a => a.model_TownBell, { color: Colors3.tileHouse2, ground: "small" })
+		.withPathing(Pathing.ConnectAll_Adj4().preventDiagonals()),
+	Fountain: makeSimpleBuilding("fountain", a => a.model_Fountain, { ground: "large" })
+		.withPathing(Pathing.ConnectAll_Adj4().preventDiagonals()),
+
+	Sawmill: makeSimpleBuilding("sawmill", a => a.model_Sawmill, { ground: "large" }),
+
 	Path: {
 		name: "path",
 		model: a => a.model_LineCap,
+		icon: { model: a => a.model_RoadStone },
 		color: Colors3.tileRoad1,
 		centerVariance: 0,
 		pathing: Pathing.ConnectAll_Adj8(),
@@ -118,7 +154,7 @@ export const Tiles = {
 				ctx.growMeshOnTile(
 					tile.models,
 					tile,
-					ctx.assets.getModel(this.model),
+					ctx.assets.model_LineCap,
 					new color3(this.color),
 					pos.setZ(Z_PathDepth),
 					new float3(size, size, size),
@@ -127,15 +163,89 @@ export const Tiles = {
 			}
 		}
 	},
-	Fountain: makeSimpleBuilding("fountain", a => a.model_Fountain, { ground: "large" })
-		.withPathing(Pathing.ConnectAll_Adj4().preventDiagonals()),
+
+	Stone: {
+		name: "stone",
+		model: a => a.model_Stone1,
+		icon: {
+			baseDegZ: -60,
+		},
+		color: Colors3.tileDark,
+		centerVariance: 0.1,
+		place(ctx, tile) {
+			ctx.addScore(tile, 1);
+			ctx.replaceTile(tile, this);
+		},
+		regen(ctx, tile) {
+			const rng = tile.rng(ctx);
+
+			// Check for neighbouring stones and adjust the center to be nearer
+			const adj = ctx.grid.getAdj8(tile.pos);
+			const pullForce = new P2(0, 0);
+			let pullCount = 0;
+			function addTileWeight(tile: Tile, x: number, y: number) {
+				let weight = Math.abs(x) == Math.abs(y) ? 1.25 : 1;
+
+				if (tile.type == Tiles.Stone) {
+					pullForce.addXY(x * weight, y * weight);
+					pullCount++;
+				}
+			}
+			addTileWeight(adj.ul, -1, +1);
+			addTileWeight(adj.u, +0, +1);
+			addTileWeight(adj.ur, +1, +1);
+			addTileWeight(adj.l, -1, +0);
+			addTileWeight(adj.r, +1, +0);
+			addTileWeight(adj.dl, -1, -1);
+			addTileWeight(adj.d, +0, -1);
+			addTileWeight(adj.dr, +1, -1);
+			let center = new P2(0, 0);
+			if (pullCount > 0) {
+				center = pullForce
+					.mulS(1.0 / pullCount)
+					.mulXY(0.2, 0.2)
+					.clampXY(-1, 1, -1, 1);
+			}
+
+			const centerPos = new float3(center.x, center.y - 0.1, 0)
+				.add({ x: tile.pos.x, y: tile.pos.y, z: 0 });
+
+			// Add random offset
+			const offset = this.centerVariance ?? 0;
+			centerPos.x += rng.nextF(-offset, offset);
+			centerPos.y += rng.nextF(-offset, offset);
+
+			if (tile.firstTimeBuild()) {
+				// Grow the new model
+				const model = rng.choose(ctx.assets.model_SingleStones);
+				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
+				ctx.growMeshOnTile(
+					tile.models,
+					tile,
+					model,
+					new color3(this.color),
+					centerPos,
+					new float3().setScalar(rng.nextF(0.9, 1)),
+					Utils3.rotZRad(rng.nextRadians())
+				);
+				return;
+			}
+			else {
+				// Move the existing model
+				ctx.addAnim(Anims.moveModel(
+					tile.models.models[0]!,
+					centerPos
+				));
+			}
+		},
+	},
 
 	Tree: {
 		name: "tree",
 		model: a => a.model_Tree1,
 		icon: {
 			baseDegZ: -60,
-			baseSize: 0.6,
+			baseSize: 0.8,
 		},
 		color: Colors3.tileTree1,
 		centerVariance: 0.05,
@@ -340,6 +450,7 @@ export const Tiles = {
 	Water: {
 		name: "water",
 		model: a => a.model_Water,
+		icon: { baseSize: 1.25 },
 		color: Colors3.tileWater,
 		regen(ctx, tile) {
 			const [fill, rot] = calcFillTileType(ctx, tile, t => t.type == Tiles.Water || t.type == Tiles.Bridge);

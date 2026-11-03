@@ -4,7 +4,7 @@ import { Frame } from "../game/Frame";
 import { GameAnim } from "../game/GameAnims";
 import { BuildID, BuildTimestamp, CTX, GameState } from "../game/GameState";
 import { GameRenderer } from "../game/render/GameRenderer";
-import { dev_ShouldAddDevVisualModels, addDevVisualModels } from "../game/render/RenderAssets";
+import { dev_ShouldAddDevVisualModels, addDevVisualModels } from "../game/render/_assets_";
 import { Tile, TileType } from "../game/Tile";
 
 export class GameView implements IView {
@@ -181,11 +181,21 @@ export class GameView implements IView {
 		this.hoverTileEnd();
 	}
 	dragOverTile(pos: P2) {
+		// Check if undoing last drag move
+		if (this.interactTiles.length >= 2
+			&& pos.equals(this.interactTiles[this.interactTiles.length - 2]!)) {
+			// Undo last move
+			this.interactTiles.pop();
+			const ctx = new CTX(this.game);
+			ctx.updatePlacementPreview(this.currItem, this.interactTiles);
+			ctx.finalize();
+			return;
+		}
+
 		if (this.interactTiles.find(p => p.equals(pos)))
 			return; // already in set
 
 		const ctx = new CTX(this.game);
-		const tile = ctx.grid.get(pos);
 		if (!ctx.game.isPlayablePos(pos))
 			return; // Position is outside playable boundary
 

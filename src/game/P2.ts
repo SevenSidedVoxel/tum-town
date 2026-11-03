@@ -109,3 +109,20 @@ export function clamp01(x: number) { return clamp(x, 0, 1); }
 export function clamp(x: number, min: number, max: number) {
 	return Math.min(max, Math.max(min, x));
 }
+
+export const Directions4 = [
+	new P2(+1, +0),
+	new P2(+0, +1),
+	new P2(-1, +0),
+	new P2(+0, -1),
+];
+export const Directions8 = [
+	new P2(+1, +0),
+	new P2(+1, +1),
+	new P2(+0, +1),
+	new P2(-1, +1),
+	new P2(-1, +0),
+	new P2(-1, -1),
+	new P2(+0, -1),
+	new P2(+1, -1),
+];

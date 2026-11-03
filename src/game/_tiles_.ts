@@ -30,13 +30,13 @@ export const Tiles = {
 		},
 		color: Colors3.tileHouse1,
 		centerVariance: 0.025,
-		pathing: Pathing.ConnectAny_Adj4(),
+		pathing: Pathing.ConnectAny_Adj8(),
 		place(ctx, tile) {
 			ctx.addScore(tile, 1);
 			ctx.replaceTile(tile, this);
 		},
 		interact(ctx, tile) {
-			ctx.paths.rotatePath_Adj4(ctx, tile);
+			ctx.paths.rotatePath(ctx, tile);
 		},
 		regen(ctx, tile) {
 			if (tile.firstTimeBuild()) {
@@ -125,11 +125,12 @@ export const Tiles = {
 	},
 
 	TownBell: makeSimpleBuilding("town bell", a => a.model_TownBell, { color: Colors3.tileHouse2, ground: "small" })
-		.withPathing(Pathing.ConnectAll_Adj4().preventDiagonals()),
+		.withPathing(Pathing.ConnectAll_Adj4().blockDiagonals()),
 	Fountain: makeSimpleBuilding("fountain", a => a.model_Fountain, { ground: "large" })
-		.withPathing(Pathing.ConnectAll_Adj4().preventDiagonals()),
+		.withPathing(Pathing.ConnectAll_Adj4().blockDiagonals()),
 
-	Sawmill: makeSimpleBuilding("sawmill", a => a.model_Sawmill, { ground: "large" }),
+	Sawmill: makeSimpleBuilding("sawmill", a => a.model_Sawmill, { ground: "large" })
+		.withPathing(Pathing.ConnectAny_Adj8()),
 
 	Path: {
 		name: "path",
@@ -137,7 +138,9 @@ export const Tiles = {
 		icon: { model: a => a.model_RoadStone },
 		color: Colors3.tileRoad1,
 		centerVariance: 0,
-		pathing: Pathing.ConnectAll_Adj8(),
+		pathing: Pathing.ConnectAll_Adj8()
+			.markSource()
+			.blockDiagonals(),
 		place(ctx, tile) {
 			ctx.addScore(tile, 1);
 			ctx.replaceTile(tile, this);
@@ -579,9 +582,9 @@ function makeSimpleBuilding(
 		model: model,
 		color: color,
 		centerVariance: 0,
-		pathing: Pathing.ConnectAny_Adj4(),
+		pathing: Pathing.ConnectAny_Adj8(),
 		interact(ctx, tile) {
-			ctx.paths.rotatePath_Adj4(ctx, tile);
+			ctx.paths.rotatePath(ctx, tile);
 		},
 		regen(ctx, tile) {
 			if (tile.firstTimeBuild()) {

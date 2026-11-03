@@ -261,6 +261,12 @@
   height: 5em;
 }
 
+@media (orientation: portrait) {
+  .game-act-icon {
+    height: 3.5em;
+  }
+}
+
 .game-act-icon-selected {
   border: 2px solid var(--col-bgBtnBorder);
 }

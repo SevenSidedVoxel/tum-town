@@ -17,7 +17,7 @@ import { Colors3 } from "../styles/colors";
 import { getLineTransform, trs3D } from "../utils/renderUtils";
 
 export const BuildTimestamp = __BUILD_TIMESTAMP__;
-export const BuildID = "bereaved";
+export const BuildID = "bouncy";
 
 const shouldLogTileDataUpdates = false;
 

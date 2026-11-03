@@ -110,7 +110,7 @@ export class Tile {
 		ctx.addAnim(this.models.destroyAll_anim(duration));
 
 		// Destroy Paths
-		ctx.paths.disconnectFromAll(this.pos);
+		ctx.paths.clear(this.pos);
 
 		// Reset cache
 		this.resetDrawCache();
@@ -127,7 +127,7 @@ export class Tile {
 		this.models.reset();
 
 		// Destroy Paths
-		ctx.paths.disconnectFromAll(this.pos);
+		ctx.paths.clear(this.pos);
 
 		// Reset cache
 		this.resetDrawCache();

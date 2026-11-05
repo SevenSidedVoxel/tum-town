@@ -9,6 +9,7 @@ export function makeRules(): Rule[] {
 	makeHouseRules(rules);
 	makeTownRules(rules);
 	makeForestRules(rules);
+	makeFarmRules(rules);
 	makeSawmillRules(rules);
 
 	rules.push(makeRule_Match("Make Bridge",
@@ -250,7 +251,7 @@ function makeHouseRules(rules: Rule[]) {
 			ctx.mergeTilesInto(
 				lastTile,
 				tiles.filter(t => t != lastTile),
-				Tiles.Foundation1,
+				Tiles.Building,
 				rot);
 			ctx.addScore(area.c, 3);
 		}));
@@ -260,14 +261,16 @@ function makeTownRules(rules: Rule[]) {
 	rules.push(makeRule_Match("Make Town Bell",
 		RuleRotations.None,
 		{
-			c: Tiles.Foundation1,
+			c: Tiles.Building,
 			u: Tiles.Path,
 			l: Tiles.Path,
 			r: Tiles.Path,
 			d: Tiles.Path,
 		},
 		(ctx, area, rot) => {
-			ctx.replaceTile(area.c, Tiles.TownBell, rot);
+			ctx.mergeTilesInto(area.c,
+				[area.u, area.l, area.r, area.d,],
+				Tiles.TownBell);
 			ctx.addScore(area.c, 4);
 		}));
 
@@ -281,14 +284,12 @@ function makeTownRules(rules: Rule[]) {
 			r: Tiles.Path,
 		},
 		(ctx, area, rot) => {
-			// Choose the newest tile to become the forest
-			const tiles = [area.c, area.u, area.ul, area.l];
-			const lastTile = pickLastActIndex(tiles);
+			ctx.mergeTilesInto(area.c,
+				[area.u, area.l, area.r, area.d,],
+				Tiles.Fountain);
 
-			ctx.replaceTile(area.c, Tiles.Fountain);
-
-			ctx.addScore(lastTile, 4);
-			ctx.addNat(lastTile, 1);
+			ctx.addScore(area.c, 4);
+			ctx.addNat(area.c, 1);
 		}));
 }
 
@@ -296,12 +297,145 @@ function makeSawmillRules(rules: Rule[]) {
 	rules.push(makeRule_Match("Make Sawmill",
 		RuleRotations.Rotate4,
 		{
-			c: Tiles.Foundation1,
+			c: Tiles.Building,
 			u: Tiles.Forest,
 			l: Tiles.Forest,
 		},
 		(ctx, area, rot) => {
 			ctx.replaceTile(area.c, Tiles.Sawmill, rot);
 			ctx.addScore(area.c, 4);
+		}));
+}
+
+function makeFarmRules(rules: Rule[]) {
+	rules.push(makeRule_Match("Make Barn",
+		RuleRotations.Rotate4,
+		{
+			c: Tiles.Building,
+			u: Tiles.Field,
+			l: Tiles.Field,
+			ul: Tiles.Field,
+		},
+		(ctx, area, rot) => {
+			ctx.replaceTile(area.c, Tiles.Barn, rot);
+			ctx.addScore(area.c, 8);
+		}));
+	rules.push(makeRule_Match("Pasturize Field",
+		RuleRotations.Rotate4,
+		{
+			c: Tiles.Field,
+			u: Tiles.Barn,
+		},
+		(ctx, area, rot) => {
+			ctx.replaceTile(area.c, Tiles.Pasture);
+			ctx.addScore(area.c, 4);
+			ctx.addNat(area.c, 4);
+		}));
+	rules.push(makeRule_Match("Pasturize Field",
+		RuleRotations.Rotate4,
+		{
+			c: Tiles.Field,
+			u: Tiles.Pasture,
+		},
+		(ctx, area, rot) => {
+			ctx.replaceTile(area.c, Tiles.Pasture);
+			ctx.addScore(area.c, 4);
+			ctx.addNat(area.c, 4);
+		}));
+
+	rules.push(makeRule_Match("Make Field",
+		RuleRotations.None,
+		{
+			c: Tiles.Empty,
+			u: Tiles.Stone,
+			l: Tiles.Stone,
+			r: Tiles.Stone,
+			d: Tiles.Stone,
+		},
+		(ctx, area, rot) => {
+			ctx.mergeTilesInto(
+				area.c,
+				[area.u, area.l, area.r, area.d,],
+				Tiles.Field
+			);
+
+			ctx.addScore(area.c, 4);
+			ctx.addNat(area.c, 4);
+		}));
+	rules.push(makeRule_Match("Expand Field",
+		RuleRotations.Rotate4,
+		{
+			c: Tiles.Empty,
+			u: Tiles.Stone,
+			l: Tiles.Field,
+			r: Tiles.Stone,
+			d: Tiles.Stone,
+		},
+		(ctx, area, rot) => {
+			ctx.mergeTilesInto(
+				area.c,
+				[area.u, area.r, area.d,],
+				Tiles.Field
+			);
+
+			ctx.addScore(area.c, 4);
+			ctx.addNat(area.c, 4);
+		}));
+	rules.push(makeRule_Match("Make Field Corner",
+		RuleRotations.Rotate4,
+		{
+			c: Tiles.Empty,
+			u: Tiles.Stone,
+			l: Tiles.Field,
+			r: Tiles.Stone,
+			d: Tiles.Field,
+		},
+		(ctx, area, rot) => {
+			ctx.mergeTilesInto(
+				area.c,
+				[area.u, area.r,],
+				Tiles.Field
+			);
+
+			ctx.addScore(area.c, 4);
+			ctx.addNat(area.c, 4);
+		}));
+	rules.push(makeRule_Match("Make Field Inset",
+		RuleRotations.Rotate4,
+		{
+			c: Tiles.Empty,
+			u: Tiles.Field,
+			l: Tiles.Field,
+			r: Tiles.Field,
+			d: Tiles.Stone,
+		},
+		(ctx, area, rot) => {
+			ctx.mergeTilesInto(
+				area.c,
+				[area.d,],
+				Tiles.Field
+			);
+
+			ctx.addScore(area.c, 4);
+			ctx.addNat(area.c, 4);
+		}));
+	rules.push(makeRule_Match("Join Fields",
+		RuleRotations.Rotate1,
+		{
+			c: Tiles.Empty,
+			u: Tiles.Field,
+			l: Tiles.Stone,
+			r: Tiles.Stone,
+			d: Tiles.Field,
+		},
+		(ctx, area, rot) => {
+			ctx.mergeTilesInto(
+				area.c,
+				[area.l, area.r,],
+				Tiles.Field
+			);
+
+			ctx.addScore(area.c, 4);
+			ctx.addNat(area.c, 4);
 		}));
 }

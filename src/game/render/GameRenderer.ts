@@ -17,11 +17,38 @@ import { color3, float2, float3, float4, mat4x4, quat4, Utils3, ZAxis } from "..
 import { BatchedInstance } from './BatchedInstance';
 import { degToRad } from 'three/src/math/MathUtils.js';
 import { RenderAssets } from './_assets_';
+import { ModelMesh } from './ModelMesh';
 
 export const Z_PathDepth = -0.01;
 export const Z_GroundDepth = -0.02;
 export const Z_TileBG = -0.03;
 
+export class DrawBatch {
+	public mesh!: BatchedMesh;
+	public instData!: Uint32Array;
+	public instDataTex!: THREE.DataTexture;
+
+	public addInstance(mesh: ModelMesh) {
+		const id = this.mesh.addInstance(mesh.geometryId);
+		this.instData[id] = mesh.flags;
+		this.instDataTex.needsUpdate = true;
+		return id;
+	}
+	public deleteInstance(inst: number) { return this.mesh.deleteInstance(inst); }
+
+	public setMeshAt(inst: number, mesh: ModelMesh) {
+		this.instData[inst] = mesh.flags;
+		this.instDataTex.needsUpdate = true;
+		return this.mesh.setGeometryIdAt(inst, mesh.geometryId);
+	}
+
+	public getVisibleAt(inst: number) { return this.mesh.getVisibleAt(inst); }
+	public setVisibleAt(inst: number, isVisible: boolean) { return this.mesh.setVisibleAt(inst, isVisible); }
+	public getColorAt(inst: number, color: color3 = new color3()) { return this.mesh.getColorAt(inst, color); }
+	public setColorAt(inst: number, color: color3) { return this.mesh.setColorAt(inst, color); }
+	public getMatrixAt(inst: number, matrix: mat4x4 = new mat4x4()) { return this.mesh.getMatrixAt(inst, matrix); }
+	public setMatrixAt(inst: number, matrix: mat4x4) { return this.mesh.setMatrixAt(inst, matrix); }
+}
 export class GameRenderer {
 	public isReady: boolean = false;
 
@@ -75,7 +102,7 @@ export class GameRenderer {
 	}
 
 	public assets: RenderAssets = new RenderAssets();
-	public drawBatch!: BatchedMesh;
+	public drawBatch: DrawBatch = new DrawBatch();
 
 	private async loadResourcesAsync() {
 		// Load GLTF Data
@@ -91,27 +118,58 @@ export class GameRenderer {
 		})
 
 		// Color Palette
-		this.assets.texPalette = await gltf.parser.getDependency('texture', 0);
+		this.assets.tex_Palette = await gltf.parser.getDependency('texture', 0);
+		if (this.assets.tex_Palette) {
+			fixupCustomColors(this.assets.tex_Palette);
+			function fixupCustomColors(texture: THREE.Texture) {
+				const canvas = document.createElement('canvas');
+				canvas.width = texture.width;
+				canvas.height = texture.height;
+
+				const ctx = canvas.getContext('2d');
+				if (!ctx) return;
+
+				// Draw existing texture image onto the canvas
+				ctx.drawImage(texture.image as CanvasImageSource, 0, 0);
+
+				// Ensure the custom color pixel is black
+				ctx.fillStyle = 'black';
+				ctx.fillRect(0, canvas.height - 1, 1, 1);
+
+				// Re-render the texture
+				texture.image = canvas;
+				texture.needsUpdate = true;
+			}
+		}
 
 		// Material
-		this.assets.matDefault = new THREE.MeshStandardMaterial({
-			map: this.assets.texPalette, // color palette
+		this.assets.mat_Default = new THREE.MeshStandardMaterial({
+			map: this.assets.tex_Palette, // color palette
 			// color: 0xFFFFFF, // tint
 			roughness: 0.8,
 			metalness: 0.01,
 		});
-		this.assets.matDefault.onBeforeCompile = (shader) => {
-			// Add varying: vInstanceColor
+		this.assets.mat_Default.onBeforeCompile = (shader) => {
+			// Add 	: vInstanceColor
 			const varyings = /*glsl*/`
 varying vec3 vInstanceColor;
 varying vec2 vUv;
 varying float vWorldPositionZ;
 varying float vShouldDepthShade;
 `;
-			shader.vertexShader = varyings + shader.vertexShader;
-			shader.fragmentShader = varyings + shader.fragmentShader;
+			const instDataBufferShaderCode = /*glsl*/`
+uniform sampler2D instDataBuffer;
+`;
+			shader.uniforms.instDataBuffer = this.assets.mat_Default!.userData.instDataBuffer;
 
-			// Add varying vInstanceColor to vertex shader
+			// Assemble the shaders base structure
+			shader.vertexShader = varyings
+				+ instDataBufferShaderCode
+				+ shader.vertexShader;
+			shader.fragmentShader = varyings
+				+ shader.fragmentShader;
+
+			// Add varying vInstanceColor sampling to vertex shader
 			shader.vertexShader = shader.vertexShader.replace(
 				'#include <begin_vertex>',
 				`
@@ -128,6 +186,18 @@ vInstanceColor = vec3(1, 1, 1);
 #ifdef USE_BATCHING_COLOR
 	vInstanceColor = getBatchingColor(getIndirectIndex(gl_DrawID)).rgb;
 #endif
+
+// Lookup Per Geometry Data
+vShouldDepthShade = 0.0;
+float shouldHeightWarp = 0.0;
+#ifdef USE_BATCHING
+	int instIndex = int(getIndirectIndex(gl_DrawID));
+	float instDataF = texelFetch(instDataBuffer, ivec2(instIndex, 0), 0).r;
+	uint instData = floatBitsToUint(instDataF);
+
+	shouldHeightWarp = (instData & 0x1u) != 0u ? 1.0 : 0.0;
+	vShouldDepthShade = (instData & 0x2u) != 0u ? 1.0 : 0.0;
+#endif
 `
 			);
 
@@ -140,16 +210,18 @@ mvPosition.xy *= (vec2(1, 1) + 1.25 * mvPosition.z);
 // Apply instancing transforms
 #ifdef USE_BATCHING
 mvPosition = batchingMatrix * mvPosition;
-vShouldDepthShade = batchingMatrix[3][2] >= 0.0 ? 1.0 : 0.0; // This line here?
 #endif
 #ifdef USE_INSTANCING
 mvPosition = instanceMatrix * mvPosition;
 #endif
 
 mvPosition = modelMatrix * mvPosition;
-mvPosition.y += 0.5 * mvPosition.z;
-vWorldPositionZ = mvPosition.z;
+if(shouldHeightWarp > 0.0)
+{
+	mvPosition.y += 0.5 * mvPosition.z;
+}
 
+vWorldPositionZ = mvPosition.z;
 mvPosition = viewMatrix * mvPosition;
 
 gl_Position = projectionMatrix * mvPosition;
@@ -164,7 +236,11 @@ const float InstUVSizeX = 1.0 / 16.0;
 const float InstUVSizeY = 15.0 / 16.0; // note the y-axis is flipped
 if (vUv.x < InstUVSizeX && vUv.y > InstUVSizeY) {
 	// override coloring with instance color
-	diffuseColor.rgb = vInstanceColor.rgb;
+	const float InstUVWidth = 1.0 / 16.0;
+	if(vUv.x < InstUVWidth)
+		diffuseColor.rgb = vInstanceColor.rgb;
+	else
+		diffuseColor.rgb = vec3(0.0, 0.0, 0.0);
 }
 else
 {
@@ -185,15 +261,36 @@ if(vShouldDepthShade > 0.0)
 
 		// Batched Mesh
 		const maxInstances = 2048;
-		const maxVertexCount = 10000;
-		const maxIndexCount = 20000;
+		const maxVertexCount = 20000;
+		const maxIndexCount = 30000;
 
-		this.drawBatch = new BatchedMesh(
+		{
+			const dataBuffer = new ArrayBuffer(4 * maxInstances);
+			const dataArrayF = new Float32Array(dataBuffer);
+			this.drawBatch.instData = new Uint32Array(dataBuffer);
+
+			// Create DataTexture for geometry data
+			const dataTexture = this.drawBatch.instDataTex = new THREE.DataTexture(
+				dataArrayF,
+				maxInstances, 1, // width, height
+				THREE.RedFormat,
+				THREE.FloatType
+			);
+			dataTexture.generateMipmaps = false;
+			dataTexture.minFilter = THREE.NearestFilter;
+			dataTexture.magFilter = THREE.NearestFilter;
+			dataTexture.needsUpdate = true;
+
+			// Set the texture on the material
+			this.assets.mat_Default.userData.instDataBuffer = { value: dataTexture };
+		}
+
+		this.drawBatch.mesh = new BatchedMesh(
 			maxInstances, maxVertexCount, maxIndexCount,
-			this.assets.matDefault);
-		this.drawBatch.castShadow = true;
-		this.drawBatch.receiveShadow = true;
-		this.drawBatch.matrixWorldAutoUpdate = true;
+			this.assets.mat_Default);
+		this.drawBatch.mesh.castShadow = true;
+		this.drawBatch.mesh.receiveShadow = true;
+		this.drawBatch.mesh.matrixWorldAutoUpdate = true;
 
 		// Models
 		this.assets.loadModels(gltf, this.drawBatch);
@@ -304,7 +401,7 @@ if(vShouldDepthShade > 0.0)
 			icon.updateIcon = false;
 
 			// Update model
-			icons.modelIcon.setMesh(icon.modelID);
+			icons.modelIcon.setMesh(icon.modelMesh);
 			icons.modelIcon.setColor(icon.color);
 			icons.modelIcon.rotation.setFromAxisAngle(ZAxis, degToRad(icon.modelPositioning?.baseDegZ ?? 0));
 			icons.modelIcon.scale.setScalar(icon.modelPositioning?.baseSize ?? 1);
@@ -346,11 +443,11 @@ if(vShouldDepthShade > 0.0)
 		icons.modelIcon.setVisible(false);
 	}
 
-	public addModelIcon(modelID: number, color: color3, iconInfo: IconModelInfo | undefined = undefined) {
+	public addModelIcon(mesh: ModelMesh, color: color3, iconInfo: IconModelInfo | undefined = undefined) {
 		const iconId = this.icons.reuseIconIds.length > 0
 			? this.icons.reuseIconIds.pop()!
 			: this.icons.nextIconId++;
-		const icon = new ModelIcon(iconId, modelID, color, iconInfo);
+		const icon = new ModelIcon(iconId, mesh, color, iconInfo);
 
 		// Create the style tag to hold the resulting image data URL
 		icon.imgStyleElement = document.createElement('style');
@@ -388,7 +485,7 @@ if(vShouldDepthShade > 0.0)
 
 		// Lighting
 		{
-			this.ambientLight = new THREE.AmbientLight(0xFFFFFF, 2);
+			this.ambientLight = new THREE.AmbientLight(0xFFFFFF, 3);
 			this.scene.add(this.ambientLight);
 
 			const sun = new THREE.DirectionalLight(0xefcdc7, 1);
@@ -431,7 +528,7 @@ if(vShouldDepthShade > 0.0)
 			}
 		}
 
-		this.scene.add(this.drawBatch);
+		this.scene.add(this.drawBatch.mesh);
 	}
 
 	public draw(frame: Frame) {
@@ -525,7 +622,7 @@ if(vShouldDepthShade > 0.0)
 	}
 
 	public addModel(
-		modelID: number,
+		mesh: ModelMesh,
 		pos: float3,
 		size: number,
 		color: color3,
@@ -534,11 +631,11 @@ if(vShouldDepthShade > 0.0)
 		const scale = new float3(size, size, size);
 		const matrix = new mat4x4()
 			.compose(pos, rotation, scale);
-		return this.addModel_Mat(modelID, pos, rotation, scale, matrix, color, collection);
+		return this.addModel_Mat(mesh, pos, rotation, scale, matrix, color, collection);
 	}
 
 	public addModel_TRS(
-		modelID: number,
+		mesh: ModelMesh,
 		pos: float3,
 		rot: quat4,
 		scale: float3,
@@ -546,18 +643,18 @@ if(vShouldDepthShade > 0.0)
 		collection: ModelCollection | null = null) {
 		const matrix = new mat4x4()
 			.compose(pos, rot, scale);
-		return this.addModel_Mat(modelID, pos, rot, scale, matrix, color, collection);
+		return this.addModel_Mat(mesh, pos, rot, scale, matrix, color, collection);
 	}
 
 	public addModel_Mat(
-		modelID: number,
+		mesh: ModelMesh,
 		pos: float3,
 		rotation: quat4,
 		scale: float3,
 		matrix: mat4x4,
 		color: color3,
 		collection: ModelCollection | null = null) {
-		const inst = this.drawBatch.addInstance(modelID);
+		const inst = this.drawBatch.addInstance(mesh);
 		this.drawBatch.setMatrixAt(inst, matrix);
 		this.drawBatch.setColorAt(inst, color);
 		const model = new BatchedInstance(this.drawBatch, inst, pos, rotation, scale);
@@ -566,7 +663,7 @@ if(vShouldDepthShade > 0.0)
 	}
 
 	public debugPrintShaders() {
-		const materialProperties: any = this.renderer.properties.get(this.assets.matDefault);
+		const materialProperties: any = this.renderer.properties.get(this.assets.mat_Default);
 
 		if (materialProperties.currentProgram) {
 			const gl = this.renderer.getContext();
@@ -592,7 +689,7 @@ if(vShouldDepthShade > 0.0)
 export class ModelIcon {
 	public iconId: number;
 
-	public modelID: number;
+	public modelMesh: ModelMesh;
 	public color: color3;
 	public modelPositioning: IconModelInfo | undefined;
 
@@ -600,9 +697,9 @@ export class ModelIcon {
 	public imgDataURL: string = '';
 	public imgStyleElement!: HTMLElement;
 
-	constructor(iconId: number, modelID: number, color: color3, iconInfo: IconModelInfo | undefined) {
+	constructor(iconId: number, modelMesh: ModelMesh, color: color3, iconInfo: IconModelInfo | undefined) {
 		this.iconId = iconId;
-		this.modelID = modelID;
+		this.modelMesh = modelMesh;
 		this.color = color;
 		this.modelPositioning = iconInfo;
 	}

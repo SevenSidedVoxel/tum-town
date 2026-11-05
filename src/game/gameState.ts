@@ -15,9 +15,10 @@ import { color3, float3, quat4 } from "../utils/threeUtils";
 import { BatchedInstance } from "./render/BatchedInstance";
 import { Colors3 } from "../styles/colors";
 import { getLineTransform, trs3D } from "../utils/renderUtils";
+import { ModelMesh } from './render/ModelMesh';
 
 export const BuildTimestamp = __BUILD_TIMESTAMP__;
-export const BuildID = "bouncy";
+export const BuildID = "bovinacular";
 
 const shouldLogTileDataUpdates = false;
 
@@ -363,7 +364,7 @@ export class CTX {
 	public growMeshOnTile(
 		collection: ModelCollection,
 		tile: Tile,
-		modelID: number,
+		mesh: ModelMesh,
 		color: color3,
 		pos: float3 = new float3(tile.pos.x, tile.pos.y, 0),
 		scale: float3 = new float3().setScalar(1),
@@ -374,7 +375,7 @@ export class CTX {
 	): BatchedInstance {
 		// Create initial model
 		const model = this.renderer.addModel(
-			modelID,
+			mesh,
 			new float3(tile.pos.x, tile.pos.y, 0),
 			0,
 			color,
@@ -406,7 +407,7 @@ export class CTX {
 		collection: ModelCollection,
 		tile: Tile,
 		mesh: {
-			modelID: number,
+			model: ModelMesh,
 			color: color3,
 		},
 		target: trs3D,
@@ -423,7 +424,7 @@ export class CTX {
 
 		// Create initial model
 		const model = this.renderer.addModel_TRS(
-			mesh.modelID,
+			mesh.model,
 			scaleOnly ? target.pos : new float3(tile.pos.x, tile.pos.y, 0),
 			scaleOnly ? target.rot : new quat4(),
 			new float3(),

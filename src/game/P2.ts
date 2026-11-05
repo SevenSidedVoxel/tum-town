@@ -1,3 +1,5 @@
+import { Vector2 } from "three";
+
 function coordToLetter(n: number): string {
 	return String.fromCharCode(64 + n);
 }
@@ -40,6 +42,11 @@ export class P2 {
 		this.y += v.y;
 		return this;
 	}
+	public addVScaled(v: P2, s: number) {
+		this.x += v.x * s;
+		this.y += v.y * s;
+		return this;
+	}
 
 	public subS(s: number) {
 		this.x -= s;
@@ -56,6 +63,11 @@ export class P2 {
 		this.y -= v.y;
 		return this;
 	}
+	public subVScaled(v: P2, s: number) {
+		this.x -= v.x * s;
+		this.y -= v.y * s;
+		return this;
+	}
 
 	public mulS(s: number) {
 		this.x *= s;
@@ -70,6 +82,16 @@ export class P2 {
 	public mulV(v: P2) {
 		this.x *= v.x;
 		this.y *= v.y;
+		return this;
+	}
+
+	public remap(xDir: P2, yDir: P2) {
+		let x = this.x;
+		let y = this.y;
+		this.x = 0;
+		this.y = 0;
+		this.addVScaled(xDir, x);
+		this.addVScaled(yDir, y);
 		return this;
 	}
 

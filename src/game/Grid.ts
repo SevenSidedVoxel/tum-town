@@ -39,7 +39,7 @@ export class Grid<T> {
 		const dc = this.getOffset(pos, +0, -1);
 		const cl = this.getOffset(pos, -1, +0);
 		const cr = this.getOffset(pos, +1, +0);
-		return { uc, dc, cl, cr };
+		return { u: uc, d: dc, l: cl, r: cr };
 	}
 
 	public getAdj8(pos: P2): Adj8<T> {

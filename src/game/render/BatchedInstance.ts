@@ -1,5 +1,7 @@
 import { BatchedMesh } from "three";
 import { color3, float3, mat4x4, quat4 } from "../../utils/threeUtils";
+import { ModelMesh } from './ModelMesh';
+import { DrawBatch } from "./GameRenderer";
 
 export class BatchedInstance {
 	private static _nextID = 0;
@@ -7,7 +9,7 @@ export class BatchedInstance {
 	private static _matrix = new mat4x4();
 
 	constructor(
-		public batch: BatchedMesh,
+		public batch: DrawBatch,
 		public instId: number,
 		public position = new float3(),
 		public rotation = new quat4(),
@@ -20,8 +22,8 @@ export class BatchedInstance {
 		return this;
 	}
 
-	setMesh(meshId: number) {
-		this.batch.setGeometryIdAt(this.instId, meshId);
+	setMesh(mesh: ModelMesh) {
+		this.batch.setMeshAt(this.instId, mesh);
 		return this;
 	}
 

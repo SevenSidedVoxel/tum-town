@@ -347,6 +347,7 @@
   --col-tileHouse1: #73291b;
   --col-tileHouse2: #9e3925;
   --col-tileHouse3: #c05440;
+  --col-path: #584a3d;
   --col-tileRoad1: #584a3d;
   --col-tileRoad2: #584a3d;
   --col-tileBridge: #47566f;
@@ -354,12 +355,20 @@
   --col-tileTree1: #2b6228;
   --col-tileTree2: #40943d;
   --col-tileTree3: #55b853;
+  --col-fence: #9c8a7f;
   --col-floorDirt: #201c18;
   --col-floorForest: #0c2918;
   --col-flower1: #9e5d25;
   --col-flower2: #bc7127;
   --col-flower3: #9e6e25;
   --col-flower4: #9e4d25;
+  --col-grass1: #133217;
+  --col-grass2: #1c3c14;
+  --col-grass3: #2c4617;
+  --col-grass4: #405019;
+  --col-cow1: #9c8a7f;
+  --col-cow2: #afa198;
+  --col-cow3: #beb3ab;
 }
 
 /* src/styles/anims.css */

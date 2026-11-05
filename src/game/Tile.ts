@@ -9,6 +9,7 @@ import { Tiles } from "./_tiles_";
 import { ModelCollection } from "./ModelCollection";
 import { Pathing } from "./PathSystem";
 import { RenderAssets } from "./render/_assets_";
+import { ModelMesh } from './render/ModelMesh';
 import { Color } from "three";
 
 export class Tile {
@@ -91,9 +92,9 @@ export class Tile {
 	}
 
 	public static getTileBaseColor(pos: P2): color3 {
-		const isDark = (pos.x + (pos.y % 2)) % 2 == 0;
-		return new color3(isDark ? Colors.tileDark : Colors.tileLight);
+		return new color3(this.isDark(pos) ? Colors.tileDark : Colors.tileLight);
 	}
+	public static isDark(pos: P2): boolean { return (pos.x + (pos.y % 2)) % 2 == 0; }
 
 	//#endregion Visuals
 
@@ -145,7 +146,7 @@ class TileDrawCache {
 export type TileIcon = {
 	baseSize?: number;
 	baseDegZ?: number;
-	model?: (assets: RenderAssets) => number;
+	model?: (assets: RenderAssets) => ModelMesh;
 };
 
 export type TileType = {
@@ -164,10 +165,18 @@ export type TileType = {
 
 	// Visuals
 	color?: color3;
-	model?: (assets: RenderAssets) => number;
+	model?: (assets: RenderAssets) => ModelMesh;
 	centerVariance?: number;
 	regen?: (ctx: CTX, tile: Tile) => void;
+
+	// Tags
+	tags?: string[],
 };
+
+export function hasTag(type: TileType, tag: string): boolean {
+	if (!type.tags) return false;
+	return type.tags.find(t => t == tag) != undefined;
+}
 
 export function pickLastActIndex(tiles: Tile[]) {
 	let last = tiles[0]!;

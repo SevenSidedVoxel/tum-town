@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import { degToRad } from 'three/src/math/MathUtils.js';
+import { P2 } from '../game/P2';
 
 export const color3 = THREE.Color;
 export type color3 = THREE.Color;
@@ -48,5 +50,12 @@ export class Utils3 {
 	public static rotZDeg(angle: number) { return this.rotZRad(angle * Math.PI / 180); }
 	public static rotZRad(angle: number) {
 		return new quat4().setFromAxisAngle(ZAxis, angle);
+	}
+
+	public static degToDirs(angle: number): [xDir: P2, yDir: P2] {
+		const rad = degToRad(angle);
+		const s = Math.sin(rad);
+		const c = Math.cos(rad);
+		return [new P2(c, s), new P2(-s, c)];
 	}
 }

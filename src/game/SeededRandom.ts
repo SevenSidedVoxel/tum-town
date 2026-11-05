@@ -1,5 +1,5 @@
 import { float2, float3, float4 } from "../utils/threeUtils";
-import { P2 } from "./P2";
+import { clamp, P2 } from "./P2";
 
 export class RandomSlice {
 	public values: number[];
@@ -36,8 +36,9 @@ export class RandomSlice {
 		return value;
 	}
 
+	/** min: inclusive, max: exclusive */
 	public nextI(min: number = 0, max: number = 1): number {
-		return Math.floor(min + (max - min) * this.next01());
+		return Math.min(Math.floor(min + (max - min) * this.next01()), max);
 	}
 	public nextF(min: number = 0, max: number = 1): number {
 		return min + (max - min) * this.next01();
@@ -61,7 +62,7 @@ export class RandomSlice {
 	public nextF4() { return new float4(this.next01(), this.next01(), this.next01(), this.next01()); }
 
 	public choose<T>(options: T[]): T {
-		return options[Math.floor(this.next01() * options.length)]!;
+		return options[this.nextI(0, options.length)]!;
 	}
 
 	public slice(seed: number);

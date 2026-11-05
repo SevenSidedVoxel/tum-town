@@ -32,6 +32,7 @@
 	"tileHouse1": "#73291b",
 	"tileHouse2": "#9e3925",
 	"tileHouse3": "#c05440",
+	"path": "#584a3d",
 	"tileRoad1": "#584a3d",
 	"tileRoad2": "#584a3d",
 	"tileBridge": "#47566f",
@@ -39,6 +40,7 @@
 	"tileTree1": "#2b6228",
 	"tileTree2": "#40943d",
 	"tileTree3": "#55b853",
+	"fence": "#9c8a7f",
 
 	"floorDirt": "#201c18",
 	"floorForest": "#0c2918",
@@ -46,5 +48,14 @@
 	"flower1": "#9e5d25",
 	"flower2": "#bc7127",
 	"flower3": "#9e6e25",
-	"flower4": "#9e4d25"
+	"flower4": "#9e4d25",
+
+	"grass1": "#133217",
+	"grass2": "#1c3c14",
+	"grass3": "#2c4617",
+	"grass4": "#405019",
+
+	"cow1": "#9c8a7f",
+	"cow2": "#afa198",
+	"cow3": "#beb3ab"
 }

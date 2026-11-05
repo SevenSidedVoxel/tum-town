@@ -62,10 +62,10 @@ export class Area3x3 {
 
 export class Adj4<T> {
 	constructor(
-		public uc: T,
-		public dc: T,
-		public cl: T,
-		public cr: T,
+		public u: T,
+		public d: T,
+		public l: T,
+		public r: T,
 	) { }
 }
 

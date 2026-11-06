@@ -68,35 +68,15 @@ export const Tiles = {
 	House3: makeSimpleBuilding("mansion", a => a.model_House_Big, { scale: 0.8, color: Colors3.tileHouse3 }),
 
 	Building: makeSimpleBuilding("building", a => a.model_Building, { scale: 0.8, color: Colors3.tileHouse2 }),
-
-	Church: makeSimpleBuilding("church", a => a.model_Church, { scale: 0.8, color: Colors3.white }),
-	Graveyard: makeFieldType("graveyard",
-		a => a.model_Graves[0]!,
-		a => a.model_StoneWalls,
-		t => t.type == Tiles.Graveyard || t.type == Tiles.Church,
-		{
-			color: Colors3.white,
-			innerBuild: (ctx, tile) => {
-				const rng = tile.rng(ctx);
-				const centerPos = Tile.calcVisualCenterPos(tile.pos);
-				distributeObjects(ctx, tile, rng, centerPos, {
-					scaleRange: new P2(0.6, 0.8),
-					posVariance: 0,
-					models: ctx.assets.model_Graves,
-					colors: [Colors3.flower1, Colors3.flower2, Colors3.flower3, Colors3.flower4],
-					rotVariance: 30,
-				});
-			}
-		}),
-
-	TownBell: makeSimpleBuilding("town bell", a => a.model_TownBell, { color: Colors3.tileHouse2, ground: "small" })
-		.withPathing(Pathing.ConnectAll_Adj8().blockDiagonals()),
-	Fountain: makeSimpleBuilding("fountain", a => a.model_Fountain, { ground: "large" })
-		.withPathing(Pathing.ConnectAll_Adj8().blockDiagonals()),
-
 	Sawmill: makeSimpleBuilding("sawmill", a => a.model_Sawmill, { ground: "large" })
 		.withPathing(Pathing.ConnectAny_Adj8()),
+	Mine: makeSimpleBuilding("mine", a => a.model_Mine, { ground: "large" })
+		.withPathing(Pathing.ConnectAny_Adj8()),
 
+	TownBell: makeSimpleBuilding("town bell", a => a.model_TownBell, { color: Colors3.tileHouse2, ground: "small" })
+		.withPathing(Pathing.ConnectAll_Adj8().markSource().blockDiagonals()),
+	Fountain: makeSimpleBuilding("fountain", a => a.model_Fountain, { ground: "large" })
+		.withPathing(Pathing.ConnectAll_Adj8().markSource().blockDiagonals()),
 	Path: {
 		name: "path",
 		model: a => a.model_LineCap,
@@ -131,6 +111,26 @@ export const Tiles = {
 			}
 		}
 	},
+
+	Church: makeSimpleBuilding("church", a => a.model_Church, { scale: 0.8, color: Colors3.white }),
+	Graveyard: makeFieldType("graveyard",
+		a => a.model_Graves[0]!,
+		a => a.model_StoneWalls,
+		t => t.type == Tiles.Graveyard || t.type == Tiles.Church,
+		{
+			color: Colors3.white,
+			innerBuild: (ctx, tile) => {
+				const rng = tile.rng(ctx);
+				const centerPos = Tile.calcVisualCenterPos(tile.pos);
+				distributeObjects(ctx, tile, rng, centerPos, {
+					scaleRange: new P2(0.6, 0.8),
+					posVariance: 0,
+					models: ctx.assets.model_Graves,
+					colors: [Colors3.flower1, Colors3.flower2, Colors3.flower3, Colors3.flower4],
+					rotVariance: 30,
+				});
+			}
+		}),
 
 	Stone: {
 		name: "stone",
@@ -350,7 +350,7 @@ export const Tiles = {
 
 			if (tile.firstTimeBuild()) {
 				// Grow the new model
-				const model = rng.choose(ctx.assets.model_SingleTrees);
+				const model = rng.choose(ctx.assets.model_SmallTrees);
 				ctx.addAnim(tile.setTileColor_anim(Colors3.floorForest));
 				ctx.growMeshOnTile(
 					tile.models,
@@ -373,7 +373,6 @@ export const Tiles = {
 		},
 		tags: [Tags.ConnectsToFields]
 	},
-
 	Forest: {
 		name: "forest",
 		model: a => a.model_Tree1,
@@ -397,7 +396,7 @@ export const Tiles = {
 					new P2(0.75, 0.75),
 				];
 				for (let pos of positions) {
-					const model = rng.choose(ctx.assets.model_SingleTrees);
+					const model = rng.choose(ctx.assets.model_SmallTrees);
 					const p = pos
 						.addXY(centerPos.x - 0.5, centerPos.y - 0.5)
 						.addXY(rng.nextF(-0.05, 0.05), rng.nextF(-0.05, 0.05));
@@ -495,6 +494,7 @@ export const Tiles = {
 				const centerPos = Tile.calcVisualCenterPos(tile.pos);
 				const size = 1;
 				const zDeg = rot * 90;
+				const rotQuat = Utils3.rotZDeg(zDeg);
 				const model = ctx.assets.model_WaterTiles[fill]!;
 
 				// Destroy old models
@@ -511,16 +511,37 @@ export const Tiles = {
 					{
 						pos: centerPos,
 						scale: new float3(size, size, size),
-						rot: Utils3.rotZDeg(zDeg),
+						rot: rotQuat,
 					},
 					anim: {
 						scaleOnly: true,
 					}
 				});
+
+				if (fill == ConnectTiles.Isolated) {
+					// Pond
+					const rng = tile.rng(ctx);
+					ctx.growMesh({
+						collection: tile.models,
+						tile: tile,
+						mesh: {
+							model: rng.choose(ctx.assets.model_PondDecors),
+							color: Colors3.white,
+						},
+						target:
+						{
+							pos: centerPos,
+							scale: new float3(size, size, size),
+							rot: Utils3.rotZDeg(rng.nextI(0, 3) * 90),
+						},
+						anim: {
+							scaleOnly: true,
+						}
+					});
+				}
 			}
 		},
 	},
-
 	Bridge: {
 		name: "bridge",
 		model: a => a.model_Bridge,

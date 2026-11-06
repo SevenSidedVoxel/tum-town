@@ -10,7 +10,7 @@ export function makeRules(): Rule[] {
 	makeTownRules(rules);
 	makeForestRules(rules);
 	makeFarmRules(rules);
-	makeSawmillRules(rules);
+	makeIndustrialRules(rules);
 
 	rules.push(makeRule_Match("Make Bridge",
 		RuleRotations.Rotate1,
@@ -225,13 +225,13 @@ function makeHouseRules(rules: Rule[]) {
 		{
 			c: Tiles.House1,
 			u: Tiles.House1,
-			l: Tiles.House1,
+			r: Tiles.House1,
 			d: Tiles.House1,
 		},
 		(ctx, area, rot) => {
 			ctx.mergeTilesInto(
 				area.c,
-				[area.u, area.d, area.l],
+				[area.u, area.d, area.r],
 				Tiles.House2,
 				rot);
 			ctx.addScore(area.c, 3);
@@ -262,10 +262,10 @@ function makeTownRules(rules: Rule[]) {
 		RuleRotations.None,
 		{
 			c: Tiles.Building,
-			u: Tiles.Path,
-			l: Tiles.Path,
-			r: Tiles.Path,
-			d: Tiles.Path,
+			u: Tiles.House1,
+			l: Tiles.House1,
+			r: Tiles.House1,
+			d: Tiles.House1,
 		},
 		(ctx, area, rot) => {
 			ctx.mergeTilesInto(area.c,
@@ -293,7 +293,7 @@ function makeTownRules(rules: Rule[]) {
 		}));
 }
 
-function makeSawmillRules(rules: Rule[]) {
+function makeIndustrialRules(rules: Rule[]) {
 	rules.push(makeRule_Match("Make Sawmill",
 		RuleRotations.Rotate4,
 		{
@@ -303,6 +303,20 @@ function makeSawmillRules(rules: Rule[]) {
 		},
 		(ctx, area, rot) => {
 			ctx.replaceTile(area.c, Tiles.Sawmill, rot);
+			ctx.addScore(area.c, 4);
+		}));
+
+	rules.push(makeRule_Match("Make Mine",
+		RuleRotations.Rotate4,
+		{
+			c: Tiles.Building,
+			u: Tiles.Stone,
+			l: Tiles.Stone,
+		},
+		(ctx, area, rot) => {
+			ctx.mergeTilesInto(area.c,
+				[area.u, area.l],
+				Tiles.Mine, rot);
 			ctx.addScore(area.c, 4);
 		}));
 }

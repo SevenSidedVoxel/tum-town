@@ -5,7 +5,7 @@ import { Tiles } from '../_tiles_';
 import { ModelMesh, ModelMeshFlags } from './ModelMesh';
 import { DrawBatch } from './GameRenderer';
 
-export let dev_ShouldAddDevVisualModels = 0;
+export let dev_ShouldAddDevVisualModels = 2;
 export function addDevVisualModels(ctx: CTX) {
 	// Dev: Add various models for visual development
 	console.warn("Adding Dev Visual Models");
@@ -42,6 +42,7 @@ export function addDevVisualModels(ctx: CTX) {
 
 		addTile(ctx, 1, 7, Tiles.Building);
 		addTile(ctx, 2, 7, Tiles.Sawmill);
+		addTile(ctx, 3, 7, Tiles.Mine);
 
 		addTile(ctx, 8, 1, Tiles.BigTree);
 		addTile(ctx, 7, 1, Tiles.Forest);
@@ -120,9 +121,10 @@ export class RenderAssets {
 
 	public model_Building!: ModelMesh;
 	public model_Sawmill!: ModelMesh;
+	public model_Mine!: ModelMesh;
+	public model_Barn!: ModelMesh;
 	public model_StoneWalls!: ModelMesh[];
 	public model_Fences!: ModelMesh[];
-	public model_Barn!: ModelMesh;
 
 	public model_LineSeg!: ModelMesh;
 	public model_LineCap!: ModelMesh;
@@ -137,7 +139,7 @@ export class RenderAssets {
 	public model_GrassPatch!: ModelMesh;
 	public model_GrassPatches!: ModelMesh[];
 	public model_Tree1!: ModelMesh;
-	public model_SingleTrees!: ModelMesh[];
+	public model_SmallTrees!: ModelMesh[];
 	public model_BigTree!: ModelMesh;
 	public model_XmasTree!: ModelMesh;
 
@@ -146,6 +148,7 @@ export class RenderAssets {
 
 	public model_Water!: ModelMesh;
 	public model_WaterTiles!: ModelMesh[];
+	public model_PondDecors!: ModelMesh[];
 	public model_Bridge!: ModelMesh;
 
 	// Animals
@@ -184,6 +187,7 @@ export class RenderAssets {
 
 		this.model_Building = addMesh(this, 'building');
 		this.model_Sawmill = addMesh(this, 'sawmill');
+		this.model_Mine = addMesh(this, 'mine');
 		this.model_StoneWalls = [
 			addMesh(this, 'wall_0', ModelMeshFlags.Default),
 			addMesh(this, 'wall_End', ModelMeshFlags.Default),
@@ -207,21 +211,21 @@ export class RenderAssets {
 		this.model_Fountain = addMesh(this, 'fountain');
 		this.model_TownBell = addMesh(this, 'town_bell');
 
-		this.model_GrassPatch = addMesh(this, 'grass.001');
 		this.model_GrassPatches = [
+			addMesh(this, 'grass.001'),
 			addMesh(this, 'grass.002'),
 			addMesh(this, 'grass.003'),
 			addMesh(this, 'grass.004'),
-			addMesh(this, 'grass.005'),
 		];
-		this.model_SingleTrees = [
+		this.model_GrassPatch = this.model_GrassPatches[3]!;
+		this.model_SmallTrees = [
 			addMesh(this, 'tree.001'),
 			addMesh(this, 'tree.002'),
 			addMesh(this, 'tree.003'),
 			addMesh(this, 'tree.004'),
 		];
-		this.model_Tree1 = this.model_SingleTrees[0]!;
-		this.model_SingleTrees.push(this.model_Tree1); // make Tree1 more likely
+		this.model_Tree1 = this.model_SmallTrees[0]!;
+		this.model_SmallTrees.push(this.model_Tree1); // make Tree1 more likely
 		this.model_BigTree = addMesh(this, 'tree_big.001');
 		this.model_XmasTree = addMesh(this, 'tree_xmas');
 
@@ -249,6 +253,12 @@ export class RenderAssets {
 			addMesh(this, 'water_X_fill_2O', ModelMeshFlags.NoHeightShading),
 			addMesh(this, 'water_X_fill_3', ModelMeshFlags.NoHeightShading),
 			addMesh(this, 'water_Full', ModelMeshFlags.NoHeightShading),
+		];
+		this.model_PondDecors = [
+			addMesh(this, 'pond_decor.001', ModelMeshFlags.NoHeightShading),
+			addMesh(this, 'pond_decor.002', ModelMeshFlags.NoHeightShading),
+			addMesh(this, 'pond_decor.003', ModelMeshFlags.NoHeightShading),
+			addMesh(this, 'pond_decor.004', ModelMeshFlags.NoHeightShading),
 		];
 		this.model_Water = this.model_WaterTiles[0]!;
 		this.model_Bridge = addMesh(this, 'bridge');

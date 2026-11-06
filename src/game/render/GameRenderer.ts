@@ -262,7 +262,7 @@ if(vShouldDepthShade > 0.0)
 		// Batched Mesh
 		const maxInstances = 2048;
 		const maxVertexCount = 20000;
-		const maxIndexCount = 30000;
+		const maxIndexCount = 60000;
 
 		{
 			const dataBuffer = new ArrayBuffer(4 * maxInstances);
